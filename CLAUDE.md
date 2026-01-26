@@ -11,7 +11,7 @@ Family health management PWA with OCR-powered medicine extraction and drug inter
 - **Auth**: Supabase Auth (Email + Google OAuth)
 - **Storage**: Supabase Storage
 - **OCR**: Tesseract.js + GPT-4o-mini
-- **Family Tree**: family-chart (D3-based)
+- **Family Tree**: relatives-tree (layout calculation)
 - **PWA**: next-pwa
 
 ## Design System
@@ -40,19 +40,26 @@ src/
 ```
 
 ## Key Features (To Be Implemented)
-1. Family tree with complex relationships
+1. ~~Family tree with complex relationships~~ ✅
 2. Document upload with OCR
 3. Medicine extraction (GPT-4o-mini)
 4. Drug interaction checking (OpenFDA)
 5. Blood glucose tracking
 6. Hierarchical access control
 
+### Family Tree (Phase 3B) ✅
+- Interactive family tree visualization with zoom/pan
+- Relationship management (parent, child, spouse, sibling)
+- Add/delete relationships between family members
+- Visual connectors showing relationships
+- Mobile-friendly with touch support
+
 ## Development Phases
 - Phase 1: Foundation ✅
 - Phase 2A: Database Schema ✅
 - Phase 2B: Authentication ✅
 - Phase 3A: Family Member CRUD ✅
-- Phase 3B: Family Tree Visualization
+- Phase 3B: Family Tree Visualization ✅
 - Phase 4: Document Upload & OCR
 - Phase 5: Drug Interactions
 - Phase 6: Glucose Tracking
