@@ -7,6 +7,7 @@ import {
   Eye,
   Trash2,
   MoreVertical,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -38,6 +39,8 @@ export function DocumentCard({ document }: DocumentCardProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isLoadingUrl, setIsLoadingUrl] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [extractionError, setExtractionError] = useState<string | null>(null);
 
   const isPdf = document.file_type === "application/pdf";
 
@@ -75,6 +78,32 @@ export function DocumentCard({ document }: DocumentCardProps) {
     } finally {
       setIsDeleting(false);
       setShowDeleteDialog(false);
+    }
+  };
+
+  const handleProcess = async () => {
+    setIsProcessing(true);
+    setExtractionError(null);
+
+    try {
+      const response = await fetch(`/api/documents/${document.id}/process`, {
+        method: "POST",
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setExtractionError(data.error || "Extraction failed");
+        return;
+      }
+
+      // Success - refresh page to show updated status
+      window.location.reload();
+    } catch (error) {
+      console.error("Process error:", error);
+      setExtractionError("Failed to process document");
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -119,6 +148,24 @@ export function DocumentCard({ document }: DocumentCardProps) {
                 <Eye className="h-4 w-4 mr-2" />
                 {isLoadingUrl ? "Loading..." : "View"}
               </DropdownMenuItem>
+              {document.ocr_status === "pending" && (
+                <DropdownMenuItem
+                  onClick={handleProcess}
+                  disabled={isProcessing || isPdf}
+                >
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  {isProcessing ? "Processing..." : "Extract Medicines"}
+                </DropdownMenuItem>
+              )}
+              {document.ocr_status === "failed" && (
+                <DropdownMenuItem
+                  onClick={handleProcess}
+                  disabled={isProcessing}
+                >
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Retry Extraction
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem
                 onClick={() => setShowDeleteDialog(true)}
                 className="text-red-600 focus:text-red-600"
@@ -141,6 +188,12 @@ export function DocumentCard({ document }: DocumentCardProps) {
             {formatDate(document.uploaded_at)}
           </span>
         </div>
+
+        {extractionError && (
+          <div className="mt-2">
+            <p className="text-xs text-red-600">{extractionError}</p>
+          </div>
+        )}
       </div>
 
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
