@@ -1,0 +1,172 @@
+"use client";
+
+import { useState } from "react";
+import {
+  FileText,
+  Image as ImageIcon,
+  Eye,
+  Trash2,
+  MoreVertical,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { OcrStatusBadge } from "./ocr-status-badge";
+import { deleteDocument, getDocumentUrl } from "@/actions/documents";
+import { formatFileSize } from "@/types/documents";
+import type { DocumentWithOwner } from "@/types/documents";
+
+interface DocumentCardProps {
+  document: DocumentWithOwner;
+}
+
+export function DocumentCard({ document }: DocumentCardProps) {
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isLoadingUrl, setIsLoadingUrl] = useState(false);
+
+  const isPdf = document.file_type === "application/pdf";
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString("en-IN", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  };
+
+  const handleView = async () => {
+    setIsLoadingUrl(true);
+    try {
+      const { url, error } = await getDocumentUrl(document.file_path);
+      if (error) {
+        alert(`Failed to load document: ${error}`);
+        return;
+      }
+      if (url) {
+        window.open(url, "_blank");
+      }
+    } finally {
+      setIsLoadingUrl(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    setIsDeleting(true);
+    try {
+      const result = await deleteDocument(document.id);
+      if (result.error) {
+        alert(`Failed to delete: ${result.error}`);
+      }
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteDialog(false);
+    }
+  };
+
+  return (
+    <>
+      <div className="rounded-lg border bg-card p-4 hover:shadow-md transition-shadow">
+        <div className="flex items-start justify-between">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <div className="h-12 w-12 flex-shrink-0 rounded-lg bg-muted flex items-center justify-center">
+              {isPdf ? (
+                <FileText className="h-6 w-6 text-red-500" />
+              ) : (
+                <ImageIcon className="h-6 w-6 text-blue-500" />
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <h3
+                className="font-medium truncate"
+                title={document.file_name}
+              >
+                {document.file_name}
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                For: {document.owner.full_name}
+              </p>
+            </div>
+          </div>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 flex-shrink-0"
+              >
+                <MoreVertical className="h-4 w-4" />
+                <span className="sr-only">Open menu</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={handleView} disabled={isLoadingUrl}>
+                <Eye className="h-4 w-4 mr-2" />
+                {isLoadingUrl ? "Loading..." : "View"}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => setShowDeleteDialog(true)}
+                className="text-red-600 focus:text-red-600"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
+        <div className="flex items-center justify-between mt-3">
+          <div className="flex items-center gap-2">
+            <OcrStatusBadge status={document.ocr_status} />
+            <span className="text-xs text-muted-foreground">
+              {formatFileSize(document.file_size)}
+            </span>
+          </div>
+          <span className="text-xs text-muted-foreground">
+            {formatDate(document.uploaded_at)}
+          </span>
+        </div>
+      </div>
+
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Document</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete &quot;{document.file_name}&quot;?
+              This will permanently remove the document. This action cannot be
+              undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting} className="min-h-[44px]">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className="bg-red-600 hover:bg-red-700 min-h-[44px]"
+            >
+              {isDeleting ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}

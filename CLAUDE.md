@@ -41,7 +41,7 @@ src/
 
 ## Key Features (To Be Implemented)
 1. ~~Family tree with complex relationships~~ ✅
-2. Document upload with OCR
+2. ~~Document upload with OCR~~ ✅ (Upload complete, OCR in Phase 4B)
 3. Medicine extraction (GPT-4o-mini)
 4. Drug interaction checking (OpenFDA)
 5. Blood glucose tracking
@@ -54,13 +54,23 @@ src/
 - Visual connectors showing relationships
 - Mobile-friendly with touch support
 
+### Document Management (Phase 4A) ✅
+- Upload documents (JPG, PNG, WebP, PDF) up to 10MB
+- Drag-and-drop upload interface
+- Document list with file preview icons
+- View documents via signed URLs
+- Delete documents with confirmation
+- OCR status tracking (pending → processed)
+- Documents linked to family members
+
 ## Development Phases
 - Phase 1: Foundation ✅
 - Phase 2A: Database Schema ✅
 - Phase 2B: Authentication ✅
 - Phase 3A: Family Member CRUD ✅
 - Phase 3B: Family Tree Visualization ✅
-- Phase 4: Document Upload & OCR
+- Phase 4A: Document Upload & Storage ✅
+- Phase 4B: OCR Text Extraction
 - Phase 5: Drug Interactions
 - Phase 6: Glucose Tracking
 - Phase 7: PWA Polish
