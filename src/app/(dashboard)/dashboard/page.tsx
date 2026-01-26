@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { Users, FileText, Pill, AlertTriangle } from "lucide-react";
 import Link from "next/link";
+import { InteractionAlert } from "@/components/interactions/interaction-alert";
 
 async function getStats(userId: string) {
   const supabase = await createClient();
@@ -89,6 +90,9 @@ export default async function DashboardPage() {
           Your family health hub. Manage health records for your family.
         </p>
       </div>
+
+      {/* Interaction Alert */}
+      <InteractionAlert count={stats.interactionCount} />
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Link
