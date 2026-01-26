@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { UserPlus } from "lucide-react";
+import Link from "next/link";
+import { UserPlus, GitBranch } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FamilyMemberCard } from "./family-member-card";
 import { FamilyMemberDialog } from "./family-member-dialog";
@@ -56,10 +57,20 @@ export function FamilyList({ initialMembers }: FamilyListProps) {
             your family
           </p>
         </div>
-        <Button onClick={handleAddNew}>
-          <UserPlus className="mr-2 h-4 w-4" />
-          Add Member
-        </Button>
+        <div className="flex items-center gap-2">
+          {members.length >= 2 && (
+            <Link href="/dashboard/family/tree">
+              <Button variant="outline">
+                <GitBranch className="h-4 w-4 mr-2" />
+                View Tree
+              </Button>
+            </Link>
+          )}
+          <Button onClick={handleAddNew}>
+            <UserPlus className="mr-2 h-4 w-4" />
+            Add Member
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
