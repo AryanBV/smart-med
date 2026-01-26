@@ -9,7 +9,7 @@ export default function DashboardLayout({
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
-      <main className="flex-1 container py-6 pb-20 md:pb-6">
+      <main className="flex-1 container mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-20 md:pb-6">
         {children}
       </main>
       <MobileNav />
