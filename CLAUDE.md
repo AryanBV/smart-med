@@ -72,6 +72,15 @@ src/
 - Medicines page showing all family medications
 - Document status updates (pending → processing → completed/failed)
 
+### Drug Interactions (Phase 5) ✅
+- Hybrid interaction checking (OpenFDA + GPT fallback)
+- Severity levels: minor, moderate, major, contraindicated
+- Auto-check when medicines extracted
+- Dashboard alert for unacknowledged interactions
+- Interaction cards with acknowledge/dismiss
+- Medical disclaimer on all interaction information
+- Interactions page showing all warnings
+
 ## Development Phases
 - Phase 1: Foundation ✅
 - Phase 2A: Database Schema ✅
@@ -80,7 +89,7 @@ src/
 - Phase 3B: Family Tree Visualization ✅
 - Phase 4A: Document Upload & Storage ✅
 - Phase 4B: OCR & Medicine Extraction ✅
-- Phase 5: Drug Interactions
+- Phase 5: Drug Interactions ✅
 - Phase 6: Glucose Tracking
 - Phase 7: PWA Polish
 
