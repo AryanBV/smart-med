@@ -41,8 +41,8 @@ src/
 
 ## Key Features (To Be Implemented)
 1. ~~Family tree with complex relationships~~ ✅
-2. ~~Document upload with OCR~~ ✅ (Upload complete, OCR in Phase 4B)
-3. Medicine extraction (GPT-4o-mini)
+2. ~~Document upload with OCR~~ ✅
+3. ~~Medicine extraction (GPT-4o-mini)~~ ✅
 4. Drug interaction checking (OpenFDA)
 5. Blood glucose tracking
 6. Hierarchical access control
@@ -63,6 +63,15 @@ src/
 - OCR status tracking (pending → processed)
 - Documents linked to family members
 
+### Medicine Extraction (Phase 4B) ✅
+- GPT-4o-mini vision for prescription OCR
+- Automatic medicine name, dosage, frequency extraction
+- Indian prescription format support (Tab., BD, TDS, etc.)
+- Medicine cards with active/inactive toggle
+- Delete medicines with confirmation
+- Medicines page showing all family medications
+- Document status updates (pending → processing → completed/failed)
+
 ## Development Phases
 - Phase 1: Foundation ✅
 - Phase 2A: Database Schema ✅
@@ -70,7 +79,7 @@ src/
 - Phase 3A: Family Member CRUD ✅
 - Phase 3B: Family Tree Visualization ✅
 - Phase 4A: Document Upload & Storage ✅
-- Phase 4B: OCR Text Extraction
+- Phase 4B: OCR & Medicine Extraction ✅
 - Phase 5: Drug Interactions
 - Phase 6: Glucose Tracking
 - Phase 7: PWA Polish
