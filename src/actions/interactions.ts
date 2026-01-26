@@ -280,7 +280,7 @@ export async function acknowledgeInteraction(
     .eq("id", interaction.medicine_2_id)
     .single();
 
-  const ownerIds = [med1?.owner_id, med2?.owner_id].filter(Boolean);
+  const ownerIds = [med1?.owner_id, med2?.owner_id].filter((id): id is string => Boolean(id));
 
   if (ownerIds.length === 0) {
     return { success: false, error: "Medicine not found" };
