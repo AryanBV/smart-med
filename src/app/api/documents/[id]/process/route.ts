@@ -5,6 +5,7 @@ import {
   extractMedicinesFromPDF,
 } from "@/lib/extraction";
 import { createMedicinesFromExtraction } from "@/actions/medicines";
+import { checkMemberInteractions } from "@/actions/interactions";
 import { isOpenAIConfigured } from "@/lib/openai";
 
 export async function POST(
@@ -142,6 +143,15 @@ export async function POST(
           { error: result.error || "Failed to save medicines" },
           { status: 500 }
         );
+      }
+
+      // Auto-check for drug interactions
+      try {
+        const interactionResult = await checkMemberInteractions(document.owner_id);
+        console.log(`Interaction check: ${interactionResult.interactionsFound} found, ${interactionResult.newInteractions} new`);
+      } catch (interactionError) {
+        // Don't fail the whole request if interaction check fails
+        console.error("Interaction check error:", interactionError);
       }
     }
 
