@@ -51,7 +51,8 @@ src/
 - Phase 1: Foundation ✅
 - Phase 2A: Database Schema ✅
 - Phase 2B: Authentication ✅
-- Phase 3: Family Tree
+- Phase 3A: Family Member CRUD ✅
+- Phase 3B: Family Tree Visualization
 - Phase 4: Document Upload & OCR
 - Phase 5: Drug Interactions
 - Phase 6: Glucose Tracking
