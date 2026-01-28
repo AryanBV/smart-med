@@ -1,155 +1,111 @@
-# Phase 5: Drug Interaction Checking
+# Phase 5: Drug Interaction Checking Implementation Plan
 
-## Context
-You are continuing development of `smart-med`, a family health management PWA. Phase 4B (Medicine Extraction) is complete. Users can extract medicines from prescriptions. Now we implement drug interaction checking to alert users about potentially dangerous combinations.
+> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-## CRITICAL: Use MCP Tools First
-Before writing ANY code:
-1. Use `mcp__plugin_supabase_supabase__list_tables` to verify `drug_interactions` table exists
-2. Use `mcp__plugin_supabase_supabase__get_table_schema` for `drug_interactions` table structure
-3. Use `mcp__plugin_supabase_supabase__generate_typescript_types` after any DB changes
+**Goal:** Implement drug interaction checking using OpenFDA API with GPT-4o-mini fallback to alert users about potentially dangerous medicine combinations.
 
-## Pre-Implementation Checklist
-- [ ] Read CLAUDE.md for project context
-- [ ] Verify `drug_interactions` table schema via MCP
-- [ ] Verify OPENAI_API_KEY exists in .env.local (for GPT fallback)
-- [ ] Review existing medicines actions and types
+**Architecture:** Hybrid approach - try OpenFDA first (authoritative US FDA data), fall back to GPT-4o-mini for Indian/generic medicines. Auto-check after medicine extraction. Display alerts on dashboard with acknowledge/dismiss workflow.
 
-## Architecture Overview
-
-```
-Medicines extracted from prescription
-              ↓
-Auto-trigger interaction check (or manual)
-              ↓
-1. Get all active medicines for family member
-2. For each pair of medicines:
-   a. Try OpenFDA API first (authoritative)
-   b. Fall back to GPT-4o-mini (for Indian/generic medicines)
-3. Store interactions in drug_interactions table
-              ↓
-Show warnings on dashboard + medicines page
-              ↓
-User can acknowledge/dismiss warnings
-```
-
-**Why Hybrid Approach?**
-- OpenFDA: Free, authoritative FDA data, but US-centric
-- GPT fallback: Handles Indian brand names, generics
-- Disclaimer: Always recommend consulting healthcare provider
+**Tech Stack:** Next.js 15, Supabase, OpenFDA API (free), OpenAI GPT-4o-mini, shadcn/ui Alert component
 
 ---
 
-## Step 1: Verify Drug Interactions Table
+## Pre-Implementation Notes
 
-Use MCP to check the `drug_interactions` table. It should have:
-- `id` (UUID, PK)
-- `medicine_id` (UUID, FK → medicines)
-- `interacting_medicine_id` (UUID, FK → medicines)
-- `severity` (TEXT: mild, moderate, severe, contraindicated)
-- `description` (TEXT)
-- `source` (TEXT: openfda, gpt, manual)
-- `is_acknowledged` (BOOLEAN, default false)
-- `acknowledged_at` (TIMESTAMPTZ, nullable)
-- `created_at` (TIMESTAMPTZ)
+**Database Schema Already Exists:**
+- Table: `drug_interactions` with `medicine_1_id`, `medicine_2_id` (not `medicine_id`/`interacting_medicine_id`)
+- Severity enum: `minor`, `moderate`, `major`, `contraindicated` (not `mild`, `moderate`, `severe`, `contraindicated`)
+- RLS is enabled
 
-If the table doesn't exist or is missing columns, create/update via MCP:
+**Files to Create:**
+- `src/types/interactions.ts`
+- `src/lib/openfda.ts`
+- `src/lib/interaction-gpt.ts`
+- `src/lib/interactions.ts`
+- `src/actions/interactions.ts`
+- `src/components/interactions/interaction-card.tsx`
+- `src/components/interactions/interaction-alert.tsx`
+- `src/app/(dashboard)/dashboard/interactions/page.tsx`
+- `src/app/(dashboard)/dashboard/interactions/loading.tsx`
+- `src/components/ui/alert.tsx` (via shadcn)
 
-```sql
--- Create drug_interactions table if not exists
-CREATE TABLE IF NOT EXISTS drug_interactions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  medicine_id UUID NOT NULL REFERENCES medicines(id) ON DELETE CASCADE,
-  interacting_medicine_id UUID NOT NULL REFERENCES medicines(id) ON DELETE CASCADE,
-  severity TEXT NOT NULL CHECK (severity IN ('mild', 'moderate', 'severe', 'contraindicated')),
-  description TEXT NOT NULL,
-  source TEXT NOT NULL CHECK (source IN ('openfda', 'gpt', 'manual')),
-  is_acknowledged BOOLEAN DEFAULT false,
-  acknowledged_at TIMESTAMPTZ,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(medicine_id, interacting_medicine_id)
-);
-
--- Index for faster lookups
-CREATE INDEX IF NOT EXISTS idx_drug_interactions_medicine ON drug_interactions(medicine_id);
-CREATE INDEX IF NOT EXISTS idx_drug_interactions_interacting ON drug_interactions(interacting_medicine_id);
-
--- Enable RLS
-ALTER TABLE drug_interactions ENABLE ROW LEVEL SECURITY;
-
--- RLS policies (interaction ownership via medicine → family_member → user)
--- NOTE: These policies use nested joins. If they cause issues, use the simpler 
--- alternative below and verify ownership in server actions instead.
-
-CREATE POLICY "Users can view own drug interactions"
-  ON drug_interactions FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM medicines m
-      JOIN family_members fm ON m.owner_id = fm.id
-      WHERE m.id = drug_interactions.medicine_id
-      AND fm.created_by = auth.uid()
-    )
-  );
-
-CREATE POLICY "Users can insert own drug interactions"
-  ON drug_interactions FOR INSERT
-  WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM medicines m
-      JOIN family_members fm ON m.owner_id = fm.id
-      WHERE m.id = medicine_id
-      AND fm.created_by = auth.uid()
-    )
-  );
-
-CREATE POLICY "Users can update own drug interactions"
-  ON drug_interactions FOR UPDATE
-  USING (
-    EXISTS (
-      SELECT 1 FROM medicines m
-      JOIN family_members fm ON m.owner_id = fm.id
-      WHERE m.id = drug_interactions.medicine_id
-      AND fm.created_by = auth.uid()
-    )
-  );
-
-CREATE POLICY "Users can delete own drug interactions"
-  ON drug_interactions FOR DELETE
-  USING (
-    EXISTS (
-      SELECT 1 FROM medicines m
-      JOIN family_members fm ON m.owner_id = fm.id
-      WHERE m.id = drug_interactions.medicine_id
-      AND fm.created_by = auth.uid()
-    )
-  );
-
--- ALTERNATIVE SIMPLER POLICIES (if above causes issues):
--- Use these if the nested join policies fail, then verify ownership in server actions
-/*
-CREATE POLICY "Allow all for authenticated" ON drug_interactions
-  FOR ALL USING (auth.uid() IS NOT NULL);
-*/
-```
-
-Regenerate types after creating/updating the table.
+**Files to Modify:**
+- `src/app/api/documents/[id]/process/route.ts` (add auto-check)
+- `src/app/(dashboard)/dashboard/page.tsx` (add alert)
+- `src/types/database.ts` (regenerate types)
 
 ---
 
-## Step 2: Create Interaction Types
+### Task 1: Install Alert Component
 
-Create `src/types/interactions.ts`:
+**Files:**
+- Create: `src/components/ui/alert.tsx` (via shadcn CLI)
+
+**Step 1: Install the shadcn Alert component**
+
+Run:
+```bash
+npx shadcn@latest add alert
+```
+
+Expected: Creates `src/components/ui/alert.tsx` with Alert, AlertTitle, AlertDescription exports
+
+**Step 2: Verify installation**
+
+Run:
+```bash
+ls src/components/ui/alert.tsx
+```
+
+Expected: File exists
+
+**Step 3: Commit**
+
+```bash
+git add src/components/ui/alert.tsx
+git commit -m "chore: add shadcn alert component"
+```
+
+---
+
+### Task 2: Regenerate TypeScript Types from Supabase
+
+**Files:**
+- Modify: `src/types/database.ts`
+
+**Step 1: Generate types using Supabase MCP**
+
+Use `mcp__plugin_supabase_supabase__generate_typescript_types` with project_id `zjjcykgfjobpfeobvptm`
+
+**Step 2: Update database.ts with new types**
+
+The generated types should include `drug_interactions` table.
+
+**Step 3: Commit**
+
+```bash
+git add src/types/database.ts
+git commit -m "chore: regenerate Supabase types with drug_interactions"
+```
+
+---
+
+### Task 3: Create Interaction Types
+
+**Files:**
+- Create: `src/types/interactions.ts`
+
+**Step 1: Create the types file**
 
 ```typescript
-import type { Database } from "./database";
+import type { Tables, TablesInsert } from "./database";
 
 // Database types
-export type DrugInteraction = Database["public"]["Tables"]["drug_interactions"]["Row"];
-export type DrugInteractionInsert = Database["public"]["Tables"]["drug_interactions"]["Insert"];
+export type DrugInteraction = Tables<"drug_interactions">;
+export type DrugInteractionInsert = TablesInsert<"drug_interactions">;
 
-// Severity levels
-export type InteractionSeverity = "mild" | "moderate" | "severe" | "contraindicated";
+// Severity levels (matches DB enum: minor, moderate, major, contraindicated)
+export type InteractionSeverity = "minor" | "moderate" | "major" | "contraindicated";
 
 // Source of interaction data
 export type InteractionSource = "openfda" | "gpt" | "manual";
@@ -157,10 +113,10 @@ export type InteractionSource = "openfda" | "gpt" | "manual";
 // For UI display
 export interface InteractionDisplay {
   id: string;
-  medicineId: string;
-  medicineName: string;
-  interactingMedicineId: string;
-  interactingMedicineName: string;
+  medicine1Id: string;
+  medicine1Name: string;
+  medicine2Id: string;
+  medicine2Name: string;
   severity: InteractionSeverity;
   description: string;
   source: InteractionSource;
@@ -201,8 +157,8 @@ export const SEVERITY_CONFIG: Record<InteractionSeverity, {
   bgColor: string;
   icon: "info" | "alert-triangle" | "alert-circle" | "octagon";
 }> = {
-  mild: {
-    label: "Mild",
+  minor: {
+    label: "Minor",
     color: "text-blue-600 dark:text-blue-400",
     bgColor: "bg-blue-100 dark:bg-blue-900/30",
     icon: "info",
@@ -213,8 +169,8 @@ export const SEVERITY_CONFIG: Record<InteractionSeverity, {
     bgColor: "bg-yellow-100 dark:bg-yellow-900/30",
     icon: "alert-triangle",
   },
-  severe: {
-    label: "Severe",
+  major: {
+    label: "Major",
     color: "text-orange-600 dark:text-orange-400",
     bgColor: "bg-orange-100 dark:bg-orange-900/30",
     icon: "alert-circle",
@@ -228,11 +184,30 @@ export const SEVERITY_CONFIG: Record<InteractionSeverity, {
 };
 ```
 
+**Step 2: Verify no TypeScript errors**
+
+Run:
+```bash
+npx tsc --noEmit
+```
+
+Expected: No errors related to interactions.ts
+
+**Step 3: Commit**
+
+```bash
+git add src/types/interactions.ts
+git commit -m "feat: add drug interaction types"
+```
+
 ---
 
-## Step 3: Create OpenFDA Service
+### Task 4: Create OpenFDA Service
 
-Create `src/lib/openfda.ts`:
+**Files:**
+- Create: `src/lib/openfda.ts`
+
+**Step 1: Create OpenFDA service**
 
 ```typescript
 import type { InteractionCheckResult, InteractionSeverity } from "@/types/interactions";
@@ -258,7 +233,7 @@ async function searchDrug(drugName: string): Promise<OpenFDADrugResult | null> {
     // Clean up drug name for search
     const cleanName = drugName
       .replace(/\d+\s*(mg|ml|mcg|g|iu)/gi, "") // Remove dosages
-      .replace(/tablet|capsule|syrup|injection/gi, "") // Remove forms
+      .replace(/tablet|capsule|syrup|injection|tab\.|cap\.|syp\.|inj\./gi, "") // Remove forms
       .trim();
 
     if (!cleanName) return null;
@@ -270,12 +245,13 @@ async function searchDrug(drugName: string): Promise<OpenFDADrugResult | null> {
 
     if (!response.ok) {
       if (response.status === 404) return null;
-      throw new Error(`OpenFDA API error: ${response.status}`);
+      console.error(`OpenFDA API error: ${response.status}`);
+      return null;
     }
 
     const data: OpenFDAResponse = await response.json();
     return data.results?.[0] || null;
-    
+
   } catch (error) {
     console.error(`OpenFDA search error for "${drugName}":`, error);
     return null;
@@ -310,7 +286,7 @@ export async function checkInteractionOpenFDA(
 
     // Get interaction text from drug1's label
     const drug1Interactions = drug1Info.drug_interactions || [];
-    
+
     // Check if drug2 is mentioned in drug1's interactions
     const drug2Names = [
       ...(drug2Info.openfda?.brand_name || []),
@@ -320,7 +296,7 @@ export async function checkInteractionOpenFDA(
 
     for (const interactionText of drug1Interactions) {
       const lowerText = interactionText.toLowerCase();
-      
+
       for (const name of drug2Names) {
         if (lowerText.includes(name)) {
           result.hasInteraction = true;
@@ -341,7 +317,7 @@ export async function checkInteractionOpenFDA(
 
     for (const interactionText of drug2Interactions) {
       const lowerText = interactionText.toLowerCase();
-      
+
       for (const name of drug1Names) {
         if (lowerText.includes(name)) {
           result.hasInteraction = true;
@@ -353,17 +329,17 @@ export async function checkInteractionOpenFDA(
     }
 
     return result;
-    
+
   } catch (error) {
     console.error("OpenFDA interaction check error:", error);
     return result;
   }
 }
 
-// Infer severity from interaction text
+// Infer severity from interaction text (maps to DB enum: minor, moderate, major, contraindicated)
 function inferSeverity(text: string): InteractionSeverity {
   const lower = text.toLowerCase();
-  
+
   if (
     lower.includes("contraindicated") ||
     lower.includes("do not use") ||
@@ -373,26 +349,28 @@ function inferSeverity(text: string): InteractionSeverity {
   ) {
     return "contraindicated";
   }
-  
+
   if (
     lower.includes("serious") ||
     lower.includes("severe") ||
     lower.includes("dangerous") ||
-    lower.includes("life-threatening")
+    lower.includes("life-threatening") ||
+    lower.includes("major")
   ) {
-    return "severe";
+    return "major";
   }
-  
+
   if (
     lower.includes("caution") ||
     lower.includes("monitor") ||
     lower.includes("may increase") ||
-    lower.includes("may decrease")
+    lower.includes("may decrease") ||
+    lower.includes("moderate")
   ) {
     return "moderate";
   }
-  
-  return "mild";
+
+  return "minor";
 }
 
 // Truncate description to max length
@@ -402,11 +380,21 @@ function truncateDescription(text: string, maxLength: number): string {
 }
 ```
 
+**Step 2: Commit**
+
+```bash
+git add src/lib/openfda.ts
+git commit -m "feat: add OpenFDA drug interaction service"
+```
+
 ---
 
-## Step 4: Create GPT Interaction Service (Fallback)
+### Task 5: Create GPT Interaction Service (Fallback)
 
-Create `src/lib/interaction-gpt.ts`:
+**Files:**
+- Create: `src/lib/interaction-gpt.ts`
+
+**Step 1: Create GPT fallback service**
 
 ```typescript
 import { getOpenAIClient, isOpenAIConfigured } from "./openai";
@@ -419,14 +407,14 @@ Given two medicine names, determine if there is a known drug interaction between
 Respond ONLY with a JSON object in this exact format:
 {
   "hasInteraction": true or false,
-  "severity": "mild" | "moderate" | "severe" | "contraindicated" | null,
+  "severity": "minor" | "moderate" | "major" | "contraindicated" | null,
   "description": "Brief description of the interaction" or null
 }
 
 Severity definitions:
-- mild: Minor interaction, usually not clinically significant
+- minor: Minor interaction, usually not clinically significant
 - moderate: May require monitoring or dosage adjustment
-- severe: Potentially dangerous, may require alternative medication
+- major: Potentially dangerous, may require alternative medication
 - contraindicated: Should never be taken together
 
 If no interaction is known or you're uncertain, return hasInteraction: false.
@@ -464,7 +452,7 @@ export async function checkInteractionGPT(
         },
       ],
       max_tokens: 300,
-      temperature: 0.1, // Low temperature for consistent results
+      temperature: 0.1,
     });
 
     const content = response.choices[0]?.message?.content;
@@ -478,13 +466,13 @@ export async function checkInteractionGPT(
       result.hasInteraction = true;
       result.severity = validateSeverity(parsed.severity);
       result.description = parsed.description || "Potential drug interaction detected.";
-      
+
       // Add disclaimer for GPT-sourced interactions
       result.description += " (AI-generated - please consult a healthcare provider)";
     }
 
     return result;
-    
+
   } catch (error) {
     console.error("GPT interaction check error:", error);
     return result;
@@ -492,7 +480,7 @@ export async function checkInteractionGPT(
 }
 
 function validateSeverity(severity: unknown): InteractionSeverity | null {
-  const valid: InteractionSeverity[] = ["mild", "moderate", "severe", "contraindicated"];
+  const valid: InteractionSeverity[] = ["minor", "moderate", "major", "contraindicated"];
   if (typeof severity === "string" && valid.includes(severity as InteractionSeverity)) {
     return severity as InteractionSeverity;
   }
@@ -500,11 +488,21 @@ function validateSeverity(severity: unknown): InteractionSeverity | null {
 }
 ```
 
+**Step 2: Commit**
+
+```bash
+git add src/lib/interaction-gpt.ts
+git commit -m "feat: add GPT fallback for drug interaction checking"
+```
+
 ---
 
-## Step 5: Create Combined Interaction Service
+### Task 6: Create Combined Interaction Service
 
-Create `src/lib/interactions.ts`:
+**Files:**
+- Create: `src/lib/interactions.ts`
+
+**Step 1: Create combined service**
 
 ```typescript
 import { checkInteractionOpenFDA } from "./openfda";
@@ -525,14 +523,14 @@ export async function checkInteraction(
 ): Promise<InteractionCheckResult> {
   // Try OpenFDA first (authoritative source)
   const openfdaResult = await checkInteractionOpenFDA(drug1Name, drug2Name);
-  
+
   if (openfdaResult.hasInteraction) {
     return openfdaResult;
   }
 
   // Fall back to GPT for Indian/generic medicines
   const gptResult = await checkInteractionGPT(drug1Name, drug2Name);
-  
+
   return gptResult;
 }
 
@@ -541,7 +539,7 @@ export async function checkAllInteractions(
   medicines: Array<{ id: string; name: string }>
 ): Promise<Array<InteractionCheckResult & { medicineId1: string; medicineId2: string }>> {
   const results: Array<InteractionCheckResult & { medicineId1: string; medicineId2: string }> = [];
-  
+
   // Generate all unique pairs
   const pairs: MedicinePair[] = [];
   for (let i = 0; i < medicines.length; i++) {
@@ -557,10 +555,10 @@ export async function checkAllInteractions(
 
   // Check interactions in parallel (with rate limiting)
   const BATCH_SIZE = 3; // Process 3 pairs at a time to avoid rate limits
-  
+
   for (let i = 0; i < pairs.length; i += BATCH_SIZE) {
     const batch = pairs.slice(i, i + BATCH_SIZE);
-    
+
     const batchResults = await Promise.all(
       batch.map(async (pair) => {
         const result = await checkInteraction(pair.name1, pair.name2);
@@ -571,9 +569,9 @@ export async function checkAllInteractions(
         };
       })
     );
-    
+
     results.push(...batchResults);
-    
+
     // Small delay between batches to avoid rate limits
     if (i + BATCH_SIZE < pairs.length) {
       await new Promise((resolve) => setTimeout(resolve, 500));
@@ -584,11 +582,21 @@ export async function checkAllInteractions(
 }
 ```
 
+**Step 2: Commit**
+
+```bash
+git add src/lib/interactions.ts
+git commit -m "feat: add combined interaction checking service"
+```
+
 ---
 
-## Step 6: Create Interaction Server Actions
+### Task 7: Create Interaction Server Actions
 
-Create `src/actions/interactions.ts`:
+**Files:**
+- Create: `src/actions/interactions.ts`
+
+**Step 1: Create server actions**
 
 ```typescript
 "use server";
@@ -596,10 +604,11 @@ Create `src/actions/interactions.ts`:
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { checkAllInteractions } from "@/lib/interactions";
-import type { 
-  InteractionDisplay, 
+import type {
+  InteractionDisplay,
   InteractionActionState,
-  CheckInteractionsResult 
+  CheckInteractionsResult,
+  InteractionSource,
 } from "@/types/interactions";
 
 // Get all unacknowledged interactions for current user
@@ -608,7 +617,7 @@ export async function getUnacknowledgedInteractions(): Promise<{
   error: string | null;
 }> {
   const supabase = await createClient();
-  
+
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
     return { data: null, error: "Not authenticated" };
@@ -644,9 +653,8 @@ export async function getUnacknowledgedInteractions(): Promise<{
   const { data: interactions, error } = await supabase
     .from("drug_interactions")
     .select("*")
-    .in("medicine_id", medicineIds)
+    .or(`medicine_1_id.in.(${medicineIds.join(",")}),medicine_2_id.in.(${medicineIds.join(",")})`)
     .eq("is_acknowledged", false)
-    .order("severity", { ascending: false }) // Most severe first
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -654,26 +662,38 @@ export async function getUnacknowledgedInteractions(): Promise<{
     return { data: null, error: error.message };
   }
 
-  const displayData: InteractionDisplay[] = (interactions || []).map((int) => {
-    const med1 = medicineMap.get(int.medicine_id);
-    const med2 = medicineMap.get(int.interacting_medicine_id);
-    
+  // Filter to only interactions where user owns at least one medicine
+  const userInteractions = (interactions || []).filter((int) => {
+    const med1 = medicineMap.get(int.medicine_1_id);
+    const med2 = medicineMap.get(int.medicine_2_id);
+    return med1 || med2;
+  });
+
+  const displayData: InteractionDisplay[] = userInteractions.map((int) => {
+    const med1 = medicineMap.get(int.medicine_1_id);
+    const med2 = medicineMap.get(int.medicine_2_id);
+    const ownerId = med1?.ownerId || med2?.ownerId || "";
+
     return {
       id: int.id,
-      medicineId: int.medicine_id,
-      medicineName: med1?.name || "Unknown",
-      interactingMedicineId: int.interacting_medicine_id,
-      interactingMedicineName: med2?.name || "Unknown",
+      medicine1Id: int.medicine_1_id,
+      medicine1Name: med1?.name || "Unknown",
+      medicine2Id: int.medicine_2_id,
+      medicine2Name: med2?.name || "Unknown",
       severity: int.severity as InteractionDisplay["severity"],
       description: int.description,
-      source: int.source as InteractionDisplay["source"],
-      isAcknowledged: int.is_acknowledged,
+      source: (int.source || "manual") as InteractionSource,
+      isAcknowledged: int.is_acknowledged ?? false,
       acknowledgedAt: int.acknowledged_at,
       createdAt: int.created_at,
-      ownerName: med1 ? (memberMap.get(med1.ownerId) || "Unknown") : "Unknown",
-      ownerId: med1?.ownerId || "",
+      ownerName: memberMap.get(ownerId) || "Unknown",
+      ownerId,
     };
   });
+
+  // Sort by severity (contraindicated first)
+  const severityOrder = { contraindicated: 0, major: 1, moderate: 2, minor: 3 };
+  displayData.sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity]);
 
   return { data: displayData, error: null };
 }
@@ -681,7 +701,7 @@ export async function getUnacknowledgedInteractions(): Promise<{
 // Get interaction count for dashboard
 export async function getUnacknowledgedInteractionCount(): Promise<number> {
   const supabase = await createClient();
-  
+
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return 0;
 
@@ -709,7 +729,7 @@ export async function getUnacknowledgedInteractionCount(): Promise<number> {
   const { count, error } = await supabase
     .from("drug_interactions")
     .select("*", { count: "exact", head: true })
-    .in("medicine_id", medicineIds)
+    .or(`medicine_1_id.in.(${medicineIds.join(",")}),medicine_2_id.in.(${medicineIds.join(",")})`)
     .eq("is_acknowledged", false);
 
   if (error) {
@@ -725,7 +745,7 @@ export async function checkMemberInteractions(
   memberId: string
 ): Promise<CheckInteractionsResult> {
   const supabase = await createClient();
-  
+
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
     return { success: false, interactionsFound: 0, newInteractions: 0, error: "Not authenticated" };
@@ -760,31 +780,31 @@ export async function checkMemberInteractions(
 
   // Check all interactions
   const results = await checkAllInteractions(medicines);
-  
+
   // Filter to only interactions found
   const interactions = results.filter((r) => r.hasInteraction && r.severity);
-  
+
   if (interactions.length === 0) {
     return { success: true, interactionsFound: 0, newInteractions: 0, error: null };
   }
 
   // Get existing interactions to avoid duplicates
+  const medicineIds = medicines.map((m) => m.id);
   const { data: existing } = await supabase
     .from("drug_interactions")
-    .select("medicine_id, interacting_medicine_id")
-    .or(
-      interactions.map((i) => 
-        `and(medicine_id.eq.${i.medicineId1},interacting_medicine_id.eq.${i.medicineId2})`
-      ).join(",")
-    );
+    .select("medicine_1_id, medicine_2_id")
+    .or(`medicine_1_id.in.(${medicineIds.join(",")}),medicine_2_id.in.(${medicineIds.join(",")})`);
 
   const existingSet = new Set(
-    (existing || []).map((e) => `${e.medicine_id}-${e.interacting_medicine_id}`)
+    (existing || []).flatMap((e) => [
+      `${e.medicine_1_id}-${e.medicine_2_id}`,
+      `${e.medicine_2_id}-${e.medicine_1_id}`,
+    ])
   );
 
   // Insert new interactions
   const newInteractions = interactions.filter(
-    (i) => 
+    (i) =>
       !existingSet.has(`${i.medicineId1}-${i.medicineId2}`) &&
       !existingSet.has(`${i.medicineId2}-${i.medicineId1}`)
   );
@@ -794,8 +814,8 @@ export async function checkMemberInteractions(
       .from("drug_interactions")
       .insert(
         newInteractions.map((i) => ({
-          medicine_id: i.medicineId1,
-          interacting_medicine_id: i.medicineId2,
+          medicine_1_id: i.medicineId1,
+          medicine_2_id: i.medicineId2,
           severity: i.severity!,
           description: i.description || "Potential drug interaction detected.",
           source: i.source,
@@ -805,11 +825,11 @@ export async function checkMemberInteractions(
 
     if (insertError) {
       console.error("Error inserting interactions:", insertError);
-      return { 
-        success: false, 
-        interactionsFound: interactions.length, 
-        newInteractions: 0, 
-        error: insertError.message 
+      return {
+        success: false,
+        interactionsFound: interactions.length,
+        newInteractions: 0,
+        error: insertError.message
       };
     }
   }
@@ -818,11 +838,11 @@ export async function checkMemberInteractions(
   revalidatePath("/dashboard/medicines");
   revalidatePath("/dashboard/interactions");
 
-  return { 
-    success: true, 
-    interactionsFound: interactions.length, 
+  return {
+    success: true,
+    interactionsFound: interactions.length,
     newInteractions: newInteractions.length,
-    error: null 
+    error: null
   };
 }
 
@@ -831,21 +851,16 @@ export async function acknowledgeInteraction(
   interactionId: string
 ): Promise<InteractionActionState> {
   const supabase = await createClient();
-  
+
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
     return { success: false, error: "Not authenticated" };
   }
 
-  // Verify ownership through medicine → family_member chain
+  // Get interaction
   const { data: interaction } = await supabase
     .from("drug_interactions")
-    .select(`
-      id,
-      medicine:medicines!drug_interactions_medicine_id_fkey(
-        owner:family_members!medicines_owner_id_fkey(created_by)
-      )
-    `)
+    .select("id, medicine_1_id, medicine_2_id")
     .eq("id", interactionId)
     .single();
 
@@ -853,10 +868,33 @@ export async function acknowledgeInteraction(
     return { success: false, error: "Interaction not found" };
   }
 
-  const createdBy = (interaction.medicine as { owner: { created_by: string } | null } | null)
-    ?.owner?.created_by;
-    
-  if (createdBy !== user.id) {
+  // Verify ownership through medicine → family_member chain
+  const { data: med1 } = await supabase
+    .from("medicines")
+    .select("owner_id")
+    .eq("id", interaction.medicine_1_id)
+    .single();
+
+  const { data: med2 } = await supabase
+    .from("medicines")
+    .select("owner_id")
+    .eq("id", interaction.medicine_2_id)
+    .single();
+
+  const ownerIds = [med1?.owner_id, med2?.owner_id].filter(Boolean);
+
+  if (ownerIds.length === 0) {
+    return { success: false, error: "Medicine not found" };
+  }
+
+  // Check if any of the medicine owners belong to this user
+  const { data: members } = await supabase
+    .from("family_members")
+    .select("id")
+    .in("id", ownerIds)
+    .eq("created_by", user.id);
+
+  if (!members || members.length === 0) {
     return { success: false, error: "Access denied" };
   }
 
@@ -866,6 +904,7 @@ export async function acknowledgeInteraction(
     .update({
       is_acknowledged: true,
       acknowledged_at: new Date().toISOString(),
+      acknowledged_by: user.id,
     })
     .eq("id", interactionId);
 
@@ -879,68 +918,23 @@ export async function acknowledgeInteraction(
 
   return { success: true, error: null };
 }
+```
 
-// Acknowledge all interactions for a family member
-export async function acknowledgeAllInteractions(
-  memberId: string
-): Promise<InteractionActionState> {
-  const supabase = await createClient();
-  
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return { success: false, error: "Not authenticated" };
-  }
+**Step 2: Commit**
 
-  // Verify member belongs to user
-  const { data: member } = await supabase
-    .from("family_members")
-    .select("id, created_by")
-    .eq("id", memberId)
-    .single();
-
-  if (!member || member.created_by !== user.id) {
-    return { success: false, error: "Family member not found" };
-  }
-
-  // Get medicine IDs for this member
-  const { data: medicines } = await supabase
-    .from("medicines")
-    .select("id")
-    .eq("owner_id", memberId);
-
-  if (!medicines || medicines.length === 0) {
-    return { success: true, error: null };
-  }
-
-  const medicineIds = medicines.map((m) => m.id);
-
-  // Acknowledge all interactions for these medicines
-  const { error } = await supabase
-    .from("drug_interactions")
-    .update({
-      is_acknowledged: true,
-      acknowledged_at: new Date().toISOString(),
-    })
-    .in("medicine_id", medicineIds)
-    .eq("is_acknowledged", false);
-
-  if (error) {
-    console.error("Error acknowledging interactions:", error);
-    return { success: false, error: error.message };
-  }
-
-  revalidatePath("/dashboard");
-  revalidatePath("/dashboard/interactions");
-
-  return { success: true, error: null };
-}
+```bash
+git add src/actions/interactions.ts
+git commit -m "feat: add drug interaction server actions"
 ```
 
 ---
 
-## Step 7: Create Interaction Card Component
+### Task 8: Create Interaction Card Component
 
-Create `src/components/interactions/interaction-card.tsx`:
+**Files:**
+- Create: `src/components/interactions/interaction-card.tsx`
+
+**Step 1: Create the component**
 
 ```typescript
 "use client";
@@ -984,14 +978,14 @@ export function InteractionCard({ interaction, showOwner = false }: InteractionC
   };
 
   if (isAcknowledged) {
-    return null; // Don't show acknowledged interactions
+    return null;
   }
 
   return (
     <Card className={cn("border-l-4", {
-      "border-l-blue-500": interaction.severity === "mild",
+      "border-l-blue-500": interaction.severity === "minor",
       "border-l-yellow-500": interaction.severity === "moderate",
-      "border-l-orange-500": interaction.severity === "severe",
+      "border-l-orange-500": interaction.severity === "major",
       "border-l-red-500": interaction.severity === "contraindicated",
     })}>
       <CardContent className="p-4">
@@ -1005,27 +999,27 @@ export function InteractionCard({ interaction, showOwner = false }: InteractionC
           <div className="flex-1 min-w-0">
             {/* Header */}
             <div className="flex items-center gap-2 mb-1">
-              <Badge 
-                variant="outline" 
+              <Badge
+                variant="outline"
                 className={cn("text-xs font-medium", config.color)}
               >
                 {config.label}
               </Badge>
               <Badge variant="secondary" className="text-xs">
-                {interaction.source === "openfda" ? "FDA" : "AI"}
+                {interaction.source === "openfda" ? "FDA" : interaction.source === "gpt" ? "AI" : "Manual"}
               </Badge>
             </div>
 
             {/* Medicine names */}
-            <div className="flex items-center gap-2 text-sm font-medium mb-2">
+            <div className="flex items-center gap-2 text-sm font-medium mb-2 flex-wrap">
               <span className="flex items-center gap-1">
                 <Pill className="h-3 w-3" />
-                {interaction.medicineName}
+                {interaction.medicine1Name}
               </span>
-              <span className="text-muted-foreground">×</span>
+              <span className="text-muted-foreground">+</span>
               <span className="flex items-center gap-1">
                 <Pill className="h-3 w-3" />
-                {interaction.interactingMedicineName}
+                {interaction.medicine2Name}
               </span>
             </div>
 
@@ -1042,8 +1036,7 @@ export function InteractionCard({ interaction, showOwner = false }: InteractionC
 
             {/* Disclaimer */}
             <p className="text-xs text-muted-foreground italic mb-3">
-              ⚠️ This is informational only. Always consult a healthcare provider before 
-              making changes to your medications.
+              This is informational only. Always consult a healthcare provider before making changes to your medications.
             </p>
 
             {/* Acknowledge button */}
@@ -1052,7 +1045,7 @@ export function InteractionCard({ interaction, showOwner = false }: InteractionC
               variant="outline"
               onClick={handleAcknowledge}
               disabled={isPending}
-              className="w-full sm:w-auto"
+              className="min-h-[44px]"
             >
               <Check className="h-4 w-4 mr-2" />
               {isPending ? "Acknowledging..." : "I understand, dismiss"}
@@ -1065,15 +1058,23 @@ export function InteractionCard({ interaction, showOwner = false }: InteractionC
 }
 ```
 
+**Step 2: Commit**
+
+```bash
+git add src/components/interactions/interaction-card.tsx
+git commit -m "feat: add interaction card component"
+```
+
 ---
 
-## Step 8: Create Dashboard Interaction Alert
+### Task 9: Create Dashboard Interaction Alert
 
-Create `src/components/interactions/interaction-alert.tsx`:
+**Files:**
+- Create: `src/components/interactions/interaction-alert.tsx`
+
+**Step 1: Create the alert component**
 
 ```typescript
-"use client";
-
 import Link from "next/link";
 import { AlertTriangle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -1086,19 +1087,17 @@ interface InteractionAlertProps {
 export function InteractionAlert({ count }: InteractionAlertProps) {
   if (count === 0) return null;
 
-  const isSevere = count > 0; // In real app, check severity levels
-
   return (
-    <Alert variant={isSevere ? "destructive" : "default"} className="mb-6">
+    <Alert variant="destructive">
       <AlertTriangle className="h-4 w-4" />
       <AlertTitle>Drug Interaction Warning</AlertTitle>
       <AlertDescription className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <span>
-          {count} potential drug interaction{count !== 1 ? "s" : ""} detected in your 
+          {count} potential drug interaction{count !== 1 ? "s" : ""} detected in your
           family&apos;s medications.
         </span>
         <Link href="/dashboard/interactions">
-          <Button variant={isSevere ? "outline" : "secondary"} size="sm">
+          <Button variant="outline" size="sm" className="min-h-[44px]">
             Review Now
           </Button>
         </Link>
@@ -1108,11 +1107,21 @@ export function InteractionAlert({ count }: InteractionAlertProps) {
 }
 ```
 
+**Step 2: Commit**
+
+```bash
+git add src/components/interactions/interaction-alert.tsx
+git commit -m "feat: add dashboard interaction alert component"
+```
+
 ---
 
-## Step 9: Create Interactions Page
+### Task 10: Create Interactions Page
 
-Create `src/app/(dashboard)/dashboard/interactions/page.tsx`:
+**Files:**
+- Create: `src/app/(dashboard)/dashboard/interactions/page.tsx`
+
+**Step 1: Create the page**
 
 ```typescript
 import { redirect } from "next/navigation";
@@ -1135,7 +1144,7 @@ export default async function InteractionsPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Drug Interactions</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Drug Interactions</h1>
         <p className="text-muted-foreground">
           Review potential interactions between your family&apos;s medications
         </p>
@@ -1143,7 +1152,7 @@ export default async function InteractionsPage() {
 
       {/* Error display */}
       {error && (
-        <div className="bg-destructive/10 text-destructive border border-destructive/20 rounded-lg p-4">
+        <div className="bg-red-50 dark:bg-red-900/10 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 rounded-lg p-4">
           <p className="text-sm">{error}</p>
         </div>
       )}
@@ -1154,7 +1163,7 @@ export default async function InteractionsPage() {
           <CheckCircle className="h-12 w-12 text-green-500 mb-4" />
           <h3 className="font-semibold mb-1">No Interactions Detected</h3>
           <p className="text-sm text-muted-foreground max-w-sm">
-            No drug interactions have been detected between your family&apos;s current 
+            No drug interactions have been detected between your family&apos;s current
             medications. We&apos;ll alert you if any are found.
           </p>
         </div>
@@ -1170,8 +1179,8 @@ export default async function InteractionsPage() {
                 Important Disclaimer
               </p>
               <p className="text-yellow-700 dark:text-yellow-300">
-                This information is for educational purposes only and is not a substitute 
-                for professional medical advice. Always consult your doctor or pharmacist 
+                This information is for educational purposes only and is not a substitute
+                for professional medical advice. Always consult your doctor or pharmacist
                 before making any changes to your medications.
               </p>
             </div>
@@ -1201,11 +1210,21 @@ export default async function InteractionsPage() {
 }
 ```
 
+**Step 2: Commit**
+
+```bash
+git add src/app/\(dashboard\)/dashboard/interactions/page.tsx
+git commit -m "feat: add interactions page"
+```
+
 ---
 
-## Step 10: Create Interactions Loading State
+### Task 11: Create Interactions Loading State
 
-Create `src/app/(dashboard)/dashboard/interactions/loading.tsx`:
+**Files:**
+- Create: `src/app/(dashboard)/dashboard/interactions/loading.tsx`
+
+**Step 1: Create loading state**
 
 ```typescript
 import { Skeleton } from "@/components/ui/skeleton";
@@ -1215,8 +1234,8 @@ export default function InteractionsLoading() {
     <div className="space-y-6">
       {/* Header skeleton */}
       <div>
-        <Skeleton className="h-8 w-48 mb-2" />
-        <Skeleton className="h-4 w-80" />
+        <Skeleton className="h-9 w-48 mb-2" />
+        <Skeleton className="h-5 w-80" />
       </div>
 
       {/* Disclaimer skeleton */}
@@ -1224,11 +1243,11 @@ export default function InteractionsLoading() {
 
       {/* Cards skeleton */}
       <div>
-        <Skeleton className="h-6 w-40 mb-4" />
+        <Skeleton className="h-7 w-40 mb-4" />
         <div className="grid gap-4">
-          <Skeleton className="h-40 rounded-lg" />
-          <Skeleton className="h-40 rounded-lg" />
-          <Skeleton className="h-40 rounded-lg" />
+          <Skeleton className="h-48 rounded-lg" />
+          <Skeleton className="h-48 rounded-lg" />
+          <Skeleton className="h-48 rounded-lg" />
         </div>
       </div>
     </div>
@@ -1236,162 +1255,115 @@ export default function InteractionsLoading() {
 }
 ```
 
+**Step 2: Commit**
+
+```bash
+git add src/app/\(dashboard\)/dashboard/interactions/loading.tsx
+git commit -m "feat: add interactions loading state"
+```
+
 ---
 
-## Step 11: Auto-Check Interactions After Medicine Extraction
+### Task 12: Update Document Processing to Auto-Check Interactions
 
-Update the document processing API route to automatically check for drug interactions after medicines are extracted.
+**Files:**
+- Modify: `src/app/api/documents/[id]/process/route.ts`
 
-**Modify `src/app/api/documents/[id]/process/route.ts`:**
+**Step 1: Add import at top of file**
 
-**1. Add import at the top (with other imports):**
+Add this import with the other imports:
 ```typescript
 import { checkMemberInteractions } from "@/actions/interactions";
 ```
 
-**2. Find where medicines are saved (around where `createMedicinesFromExtraction` is called) and add the interaction check. Replace the existing medicine saving block with:**
+**Step 2: Add interaction check after medicines are saved**
 
+Find the block where medicines are saved (after `createMedicinesFromExtraction` is called successfully) and add the interaction check. Look for this section and add the new code after the success check:
+
+After this existing code:
 ```typescript
-// Save medicines to database
-if (extraction.medicines.length > 0) {
-  const result = await createMedicinesFromExtraction(
-    documentId,
-    document.owner_id,
-    extraction.medicines
-  );
-
-  if (!result.success) {
-    await supabase
-      .from("documents")
-      .update({
-        ocr_status: "failed",
-        ocr_text: extraction.rawText,
-        ocr_error: result.error,
-      })
-      .eq("id", documentId);
-
-    return NextResponse.json(
-      { error: result.error || "Failed to save medicines" },
-      { status: 500 }
-    );
-  }
-
-  // AUTO-CHECK FOR DRUG INTERACTIONS (new code)
-  try {
-    const interactionResult = await checkMemberInteractions(document.owner_id);
-    console.log(`Interaction check: ${interactionResult.interactionsFound} found, ${interactionResult.newInteractions} new`);
-  } catch (interactionError) {
-    // Don't fail the whole request if interaction check fails
-    console.error("Interaction check error:", interactionError);
-  }
+if (!result.success) {
+  // ... error handling ...
 }
 ```
 
-This ensures interactions are checked every time medicines are extracted from a prescription.
+Add:
+```typescript
+// Auto-check for drug interactions
+try {
+  const interactionResult = await checkMemberInteractions(document.owner_id);
+  console.log(`Interaction check: ${interactionResult.interactionsFound} found, ${interactionResult.newInteractions} new`);
+} catch (interactionError) {
+  // Don't fail the whole request if interaction check fails
+  console.error("Interaction check error:", interactionError);
+}
+```
+
+**Step 3: Commit**
+
+```bash
+git add src/app/api/documents/\[id\]/process/route.ts
+git commit -m "feat: auto-check drug interactions after medicine extraction"
+```
 
 ---
 
-## Step 12: Update Dashboard with Interaction Alert
+### Task 13: Update Dashboard with Interaction Alert
 
-**Modify `src/app/(dashboard)/dashboard/page.tsx`:**
+**Files:**
+- Modify: `src/app/(dashboard)/dashboard/page.tsx`
 
-**1. Add imports at the top:**
+**Step 1: Add imports**
+
+Add these imports at the top:
 ```typescript
-import { getUnacknowledgedInteractionCount } from "@/actions/interactions";
 import { InteractionAlert } from "@/components/interactions/interaction-alert";
 ```
 
-**2. Update the stats fetching function to include interaction count. Find where stats are gathered and add:**
-```typescript
-// In your getStats function or wherever you fetch dashboard data:
-const [familyCount, documentCount, medicineCount, interactionCount] = await Promise.all([
-  getFamilyMemberCount(),
-  getDocumentCount(),
-  getActiveMedicineCount(),
-  getUnacknowledgedInteractionCount(), // ADD THIS
-]);
-```
+**Step 2: Add InteractionAlert to JSX**
 
-**3. Add the InteractionAlert component in the JSX. Place it prominently at the top of the dashboard, after the header but before the stats cards:**
+In the return statement, add the InteractionAlert component after the header and before the stats grid:
 
 ```tsx
-return (
-  <div className="space-y-6">
-    {/* Header */}
-    <div>
-      <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-      <p className="text-muted-foreground">
-        Welcome back! Here&apos;s your family health overview.
-      </p>
-    </div>
-
-    {/* INTERACTION ALERT - ADD THIS */}
-    <InteractionAlert count={interactionCount} />
-
-    {/* Stats cards */}
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-      {/* ... existing stat cards ... */}
-    </div>
-  </div>
-);
+{/* INTERACTION ALERT */}
+<InteractionAlert count={stats.interactionCount} />
 ```
 
-**4. Update the Interactions stat card to show the count and link to the interactions page:**
-```tsx
-<Link href="/dashboard/interactions">
-  <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
-    <CardHeader className="flex flex-row items-center justify-between pb-2">
-      <CardTitle className="text-sm font-medium">Interactions</CardTitle>
-      <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-    </CardHeader>
-    <CardContent>
-      <div className="text-2xl font-bold">{interactionCount}</div>
-      <p className="text-xs text-muted-foreground">
-        {interactionCount > 0 ? "Needs review" : "All clear"}
-      </p>
-    </CardContent>
-  </Card>
-</Link>
-```
+The dashboard already fetches `interactionCount` in the `getStats` function, so no changes needed there.
 
-Import `AlertTriangle` from lucide-react if not already imported.
-```
-
-Update the Interactions stat card to link to `/dashboard/interactions` and use the count.
-
----
-
-## Step 13: Install Alert Component
-
-If not already installed:
+**Step 3: Commit**
 
 ```bash
-npx shadcn@latest add alert
+git add src/app/\(dashboard\)/dashboard/page.tsx
+git commit -m "feat: add interaction alert to dashboard"
 ```
 
 ---
 
-## Step 14: Update CLAUDE.md
+### Task 14: Update CLAUDE.md
 
-Add to completed phases:
+**Files:**
+- Modify: `CLAUDE.md`
 
+**Step 1: Update development phases**
+
+Change:
 ```markdown
-## Completed Phases
-- Phase 1: Foundation ✅
-- Phase 2A: Database Schema ✅
-- Phase 2B: Authentication ✅
-- Phase 3A: Family Member CRUD ✅
-- Phase 3B: Family Tree Visualization ✅
-- Phase 4A: Document Upload & Storage ✅
-- Phase 4B: OCR & Medicine Extraction ✅
-- Phase 5: Drug Interaction Checking ✅
+- Phase 5: Drug Interactions
 ```
 
-Add to features:
+To:
 ```markdown
-### Drug Interactions (Phase 5)
+- Phase 5: Drug Interactions ✅
+```
+
+**Step 2: Add feature documentation**
+
+Add after the Medicine Extraction section:
+```markdown
+### Drug Interactions (Phase 5) ✅
 - Hybrid interaction checking (OpenFDA + GPT fallback)
-- Severity levels: mild, moderate, severe, contraindicated
+- Severity levels: minor, moderate, major, contraindicated
 - Auto-check when medicines extracted
 - Dashboard alert for unacknowledged interactions
 - Interaction cards with acknowledge/dismiss
@@ -1399,114 +1371,85 @@ Add to features:
 - Interactions page showing all warnings
 ```
 
+**Step 3: Commit**
+
+```bash
+git add CLAUDE.md
+git commit -m "docs: mark Phase 5 Drug Interactions complete"
+```
+
 ---
 
-## Step 15: Verification & Testing
+### Task 15: Build Verification
 
-### Pre-Test Requirements
-1. Have at least one family member with 2+ active medicines
-2. OpenAI API key in .env.local (for GPT fallback)
+**Step 1: Run build**
 
-### Build Check
 ```bash
 npm run build
 ```
 
-### Manual Testing
+Expected: Build succeeds with no errors
 
-1. **Auto-Check on Extraction**
-   - Upload a new prescription
-   - Extract medicines
-   - Check if any interactions were detected
-   - Dashboard should show alert if interactions found
+**Step 2: Run lint**
 
-2. **View Interactions**
-   - Go to `/dashboard/interactions`
-   - Should see any detected interactions
-   - Or empty state if none
+```bash
+npm run lint
+```
 
-3. **Acknowledge Interaction**
-   - Click "I understand, dismiss" on an interaction
-   - Card should disappear
-   - Dashboard count should decrease
-
-4. **Test with Known Interaction**
-   - Manually add medicines that are known to interact (e.g., Warfarin + Aspirin)
-   - Trigger interaction check
-   - Should detect the interaction
-
-5. **GPT Fallback**
-   - Test with Indian medicine names not in OpenFDA
-   - Should fall back to GPT and still detect some interactions
-
-6. **Dashboard Alert**
-   - With unacknowledged interactions, dashboard should show warning alert
-   - Clicking "Review Now" should go to interactions page
+Expected: No lint errors
 
 ---
 
-## Error Handling
+### Task 16: Final Commit and Push
 
-### Common Issues & Fixes
+**Step 1: Verify git status**
 
-1. **"drug_interactions table does not exist"**
-   - Run the CREATE TABLE SQL via MCP or Supabase Dashboard
-   - Regenerate types
+```bash
+git status
+```
 
-2. **"RLS policy error" or "new row violates policy"**
-   - The nested join policies can be complex
-   - **Option 1:** Fix the policy syntax
-   - **Option 2:** Use the simpler "allow all for authenticated" policy and verify ownership in server actions (already done)
-   - In production, prefer proper RLS; for MVP, server-side checks are acceptable
+**Step 2: Push all commits**
 
-3. **OpenFDA returns no results**
-   - Expected for Indian/generic medicines
-   - GPT fallback should handle these
+```bash
+git push origin main
+```
 
-4. **Rate limiting from OpenFDA**
-   - OpenFDA has generous limits (no API key needed)
-   - If issues, add more delay between requests
+---
 
-5. **GPT fallback not working**
-   - Check OPENAI_API_KEY is set
-   - Check for rate limit errors in console
+## Verification Testing
 
-6. **Interactions not showing after extraction**
-   - Check `checkMemberInteractions` is being called
-   - Verify medicines are marked as active
+### Manual Test Checklist
 
-7. **Duplicate interactions being inserted**
-   - The unique constraint should prevent this
-   - If the complex `.or()` query for checking existing fails, simplify:
-   ```typescript
-   // Simpler approach: fetch ALL existing interactions for these medicines
-   const medicineIds = medicines.map(m => m.id);
-   const { data: existing } = await supabase
-     .from("drug_interactions")
-     .select("medicine_id, interacting_medicine_id")
-     .in("medicine_id", medicineIds);
-   ```
+1. **Navigate to `/dashboard/interactions`**
+   - Should show empty state or existing interactions
 
-8. **Join errors in acknowledgeInteraction**
-   - FK constraint names may differ
-   - Use fallback: verify ownership with separate queries
+2. **Add medicines to a family member**
+   - Add at least 2 active medicines
+   - Try known interaction pairs (e.g., Aspirin + Ibuprofen, Warfarin + Aspirin)
 
-9. **Alert not showing on dashboard**
-   - Check count is > 0
-   - Verify InteractionAlert component is imported
+3. **Upload prescription and extract**
+   - Should auto-check for interactions after extraction
+   - Check console for interaction check log
 
-10. **Severity not being set correctly**
-    - Check inferSeverity function logic
-    - GPT might return null severity - handle gracefully
+4. **View interactions**
+   - Interaction cards should show with severity colors
+   - Disclaimer should be visible
+
+5. **Acknowledge interaction**
+   - Click "I understand, dismiss"
+   - Card should disappear
+   - Dashboard count should decrease
+
+6. **Dashboard alert**
+   - With unacknowledged interactions, alert should show
+   - "Review Now" should navigate to interactions page
 
 ---
 
 ## Completion Checklist
 
-- [ ] `drug_interactions` table created via MCP
-- [ ] RLS policies added
+- [ ] Alert component installed
 - [ ] Types regenerated from Supabase
-- [ ] Alert component installed (`npx shadcn@latest add alert`)
 - [ ] `src/types/interactions.ts` created
 - [ ] `src/lib/openfda.ts` created
 - [ ] `src/lib/interaction-gpt.ts` created
@@ -1518,30 +1461,6 @@ npm run build
 - [ ] `src/app/(dashboard)/dashboard/interactions/loading.tsx` created
 - [ ] Document processing triggers interaction check
 - [ ] Dashboard shows interaction alert
-- [ ] Dashboard stats include interaction count
 - [ ] `npm run build` succeeds
-- [ ] Interactions detected for known drug pairs
-- [ ] Can acknowledge interactions
-- [ ] Acknowledged interactions disappear
 - [ ] CLAUDE.md updated
-- [ ] Changes committed and pushed
-
----
-
-## Out of Scope (Future)
-
-- Severity-based notification (push notifications for severe)
-- Interaction history (show acknowledged interactions)
-- Manual interaction entry
-- PDF drug interaction report
-- Drug-food interactions
-- Drug-condition interactions
-- Dosage-based interaction severity
-
----
-
-## Git Commit Message
-
-```
-Phase 5: Drug interaction checking with OpenFDA API and GPT fallback
-```
+- [ ] All changes committed and pushed

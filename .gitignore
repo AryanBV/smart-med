@@ -44,3 +44,6 @@ public/workbox-*.js
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# claude code
+.claude/
