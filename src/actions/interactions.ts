@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { checkAllInteractions } from "@/lib/interactions";
+import { validateUUIDs } from "@/lib/utils";
 import type {
   InteractionDisplay,
   InteractionActionState,
@@ -48,11 +49,17 @@ export async function getUnacknowledgedInteractions(): Promise<{
   const medicineIds = medicines.map((m) => m.id);
   const medicineMap = new Map(medicines.map((m) => [m.id, { name: m.name, ownerId: m.owner_id }]));
 
+  // Validate UUIDs to prevent SQL injection
+  const validMedicineIds = validateUUIDs(medicineIds);
+  if (validMedicineIds.length === 0) {
+    return { data: [], error: null };
+  }
+
   // Get unacknowledged interactions
   const { data: interactions, error } = await supabase
     .from("drug_interactions")
     .select("*")
-    .or(`medicine_1_id.in.(${medicineIds.join(",")}),medicine_2_id.in.(${medicineIds.join(",")})`)
+    .or(`medicine_1_id.in.(${validMedicineIds.join(",")}),medicine_2_id.in.(${validMedicineIds.join(",")})`)
     .eq("is_acknowledged", false)
     .order("created_at", { ascending: false });
 
@@ -124,11 +131,15 @@ export async function getUnacknowledgedInteractionCount(): Promise<number> {
 
   const medicineIds = medicines.map((m) => m.id);
 
+  // Validate UUIDs to prevent SQL injection
+  const validMedicineIds = validateUUIDs(medicineIds);
+  if (validMedicineIds.length === 0) return 0;
+
   // Count unacknowledged interactions
   const { count, error } = await supabase
     .from("drug_interactions")
     .select("*", { count: "exact", head: true })
-    .or(`medicine_1_id.in.(${medicineIds.join(",")}),medicine_2_id.in.(${medicineIds.join(",")})`)
+    .or(`medicine_1_id.in.(${validMedicineIds.join(",")}),medicine_2_id.in.(${validMedicineIds.join(",")})`)
     .eq("is_acknowledged", false);
 
   if (error) {
@@ -189,10 +200,17 @@ export async function checkMemberInteractions(
 
   // Get existing interactions to avoid duplicates
   const medicineIds = medicines.map((m) => m.id);
+
+  // Validate UUIDs to prevent SQL injection
+  const validMedicineIds = validateUUIDs(medicineIds);
+  if (validMedicineIds.length === 0) {
+    return { success: true, interactionsFound: 0, newInteractions: 0, error: null };
+  }
+
   const { data: existing } = await supabase
     .from("drug_interactions")
     .select("medicine_1_id, medicine_2_id")
-    .or(`medicine_1_id.in.(${medicineIds.join(",")}),medicine_2_id.in.(${medicineIds.join(",")})`);
+    .or(`medicine_1_id.in.(${validMedicineIds.join(",")}),medicine_2_id.in.(${validMedicineIds.join(",")})`);
 
   const existingSet = new Set(
     (existing || []).flatMap((e) => [
