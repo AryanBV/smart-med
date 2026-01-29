@@ -1,0 +1,255 @@
+{
+  "audit_timestamp": "2026-01-28 12:00:00",
+  "project_name": "SMART-MED",
+
+  "executive_summary": {
+    "overall_completion_percent": 72,
+    "critical_issues_count": 3,
+    "warnings_count": 5,
+    "ready_for_production": false
+  },
+
+  "phase_status": {
+    "phase_1_foundation": {
+      "expected_items": 8,
+      "completed_items": 8,
+      "status": "COMPLETE",
+      "missing": [],
+      "notes": "All foundation items present. Supabase client/server configured with types. Auth pages (login/signup) exist. Root + dashboard + auth layouts present. 12 shadcn/ui components installed. Middleware with auth protection. PWA manifest configured. Next.js 16.1.4 (CLAUDE.md says 15)."
+    },
+    "phase_2_family_tree": {
+      "expected_items": 7,
+      "completed_items": 6,
+      "status": "COMPLETE",
+      "missing": ["access-permissions.ts (server actions)"],
+      "notes": "Family member CRUD complete (5 exports in family.ts). Relationships with bidirectional support (4 exports). Family tree visualization with relatives-tree library. Family + tree pages with loading states. Types fully defined. access_permissions table typed in DB but no server actions exist."
+    },
+    "phase_3_document_ocr": {
+      "expected_items": 7,
+      "completed_items": 5,
+      "status": "COMPLETE",
+      "missing": ["camera-capture.tsx", "supabase/functions/extract-medicines/index.ts"],
+      "notes": "Document CRUD complete (4 exports). Medicine management (6 exports). Upload dialog with drag-drop and validation. GPT-4o-mini vision OCR with Indian prescription support. API route for processing (replaces edge function). Auto-interaction check post-extraction. PDF extraction stub only. Camera capture not implemented."
+    },
+    "phase_4_drug_interactions": {
+      "expected_items": 5,
+      "completed_items": 5,
+      "status": "COMPLETE",
+      "missing": [],
+      "notes": "Hybrid checking: OpenFDA primary with GPT fallback. Severity inference (contraindicated/major/moderate/minor). Auto-check after medicine extraction. Dashboard alert for unacknowledged interactions. Interactions page with medical disclaimer. Acknowledge/dismiss flow. Batch processing with rate limiting (3 pairs/500ms)."
+    },
+    "phase_5_glucose_tracking": {
+      "expected_items": 6,
+      "completed_items": 1,
+      "status": "NOT_STARTED",
+      "missing": ["glucose.ts (actions)", "glucose.ts (types)", "glucose-chart.tsx", "reading-form.tsx", "glucose/page.tsx"],
+      "notes": "Only database schema exists (glucose_readings table fully typed in database.ts with reading_type and meal_context enums). Dashboard has a 'Log Glucose' link pointing to /dashboard/glucose which will 404. No actions, types, components, or page implemented."
+    },
+    "phase_6_pwa_polish": {
+      "expected_items": 5,
+      "completed_items": 1,
+      "status": "IN_PROGRESS",
+      "missing": ["PWA config in next.config.js", "sw.js (service worker)", "offline.html", "app icons (192/512)", "install-prompt.tsx"],
+      "notes": "next-pwa v5.6.0 listed as dependency but NOT configured in next.config.js (has comment 'Phase 6'). manifest.json exists and is complete. public/icons/ directory exists but only has .gitkeep. No service worker, offline page, or install prompt component."
+    }
+  },
+
+  "dependencies": {
+    "next_version": "16.1.4",
+    "supabase_installed": true,
+    "shadcn_installed": true,
+    "pwa_installed": true,
+    "recharts_installed": false,
+    "family_chart_installed": true,
+    "missing_critical": ["recharts (needed for glucose charts)"]
+  },
+
+  "routes_found": [
+    "/",
+    "/(auth)/login",
+    "/(auth)/signup",
+    "/(dashboard)/dashboard",
+    "/(dashboard)/dashboard/family",
+    "/(dashboard)/dashboard/family/tree",
+    "/(dashboard)/dashboard/documents",
+    "/(dashboard)/dashboard/medicines",
+    "/(dashboard)/dashboard/interactions",
+    "/api/documents/[id]/process",
+    "/auth/callback"
+  ],
+
+  "server_actions_found": [
+    "src/actions/auth.ts",
+    "src/actions/family.ts",
+    "src/actions/relationships.ts",
+    "src/actions/documents.ts",
+    "src/actions/medicines.ts",
+    "src/actions/interactions.ts"
+  ],
+
+  "components_found": [
+    "src/components/ui/alert.tsx",
+    "src/components/ui/alert-dialog.tsx",
+    "src/components/ui/avatar.tsx",
+    "src/components/ui/badge.tsx",
+    "src/components/ui/button.tsx",
+    "src/components/ui/card.tsx",
+    "src/components/ui/dialog.tsx",
+    "src/components/ui/dropdown-menu.tsx",
+    "src/components/ui/input.tsx",
+    "src/components/ui/label.tsx",
+    "src/components/ui/select.tsx",
+    "src/components/ui/skeleton.tsx",
+    "src/components/layout/header.tsx",
+    "src/components/layout/mobile-nav.tsx",
+    "src/components/layout/providers.tsx",
+    "src/components/layout/theme-toggle.tsx",
+    "src/components/layout/user-menu.tsx",
+    "src/components/auth/login-form.tsx",
+    "src/components/auth/signup-form.tsx",
+    "src/components/family/family-member-card.tsx",
+    "src/components/family/family-member-dialog.tsx",
+    "src/components/family/empty-family-state.tsx",
+    "src/components/family/add-relationship-dialog.tsx",
+    "src/components/family/relationships-list.tsx",
+    "src/components/family/family-list.tsx",
+    "src/components/family/family-tree.tsx",
+    "src/components/documents/ocr-status-badge.tsx",
+    "src/components/documents/empty-documents-state.tsx",
+    "src/components/documents/document-upload-dialog.tsx",
+    "src/components/documents/document-list.tsx",
+    "src/components/documents/document-card.tsx",
+    "src/components/medicines/medicine-card.tsx",
+    "src/components/medicines/extracted-medicines-preview.tsx",
+    "src/components/interactions/interaction-card.tsx",
+    "src/components/interactions/interaction-alert.tsx"
+  ],
+
+  "critical_issues": [
+    {
+      "severity": "CRITICAL",
+      "issue": "Glucose tracking feature completely unimplemented - dashboard links to /dashboard/glucose which returns 404",
+      "location": "src/app/(dashboard)/dashboard/glucose/ (missing entirely)",
+      "fix": "Implement glucose.ts actions, glucose.ts types, glucose-chart.tsx, reading-form.tsx, and glucose/page.tsx. DB schema already exists in database.types.ts."
+    },
+    {
+      "severity": "CRITICAL",
+      "issue": "PWA not functional - next-pwa dependency installed but not configured, no service worker, no offline page, no app icons",
+      "location": "next.config.js, public/sw.js, public/offline.html, public/icons/",
+      "fix": "Configure withPWA in next.config.js, generate service worker, create offline fallback page, add icon files (192x192, 512x512)."
+    },
+    {
+      "severity": "CRITICAL",
+      "issue": "Access permissions server actions missing - access_permissions table is typed but no CRUD operations exist",
+      "location": "src/actions/access-permissions.ts (missing)",
+      "fix": "Create access-permissions.ts with getPermissions, grantPermission, revokePermission, checkPermission server actions."
+    }
+  ],
+
+  "warnings": [
+    {
+      "severity": "WARNING",
+      "issue": "Camera capture component missing - only file upload dialog exists, no camera/photo capture for mobile",
+      "location": "src/components/documents/camera-capture.tsx (missing)",
+      "fix": "Add camera capture component using MediaDevices API or input type=file with capture attribute."
+    },
+    {
+      "severity": "WARNING",
+      "issue": "Supabase Edge Function missing - OCR processing uses Next.js API route instead",
+      "location": "supabase/functions/extract-medicines/ (missing)",
+      "fix": "Architecture difference only - API route at src/app/api/documents/[id]/process/route.ts works correctly. No action needed unless edge deployment is required."
+    },
+    {
+      "severity": "WARNING",
+      "issue": "PDF extraction not supported - extractMedicinesFromPDF returns 'not yet supported'",
+      "location": "src/lib/extraction.ts:153-161",
+      "fix": "Implement PDF text extraction using pdf-parse or similar library before passing to GPT."
+    },
+    {
+      "severity": "WARNING",
+      "issue": "CLAUDE.md version mismatch - states 'Next.js 15' but actual version is 16.1.4",
+      "location": "CLAUDE.md line referencing 'Next.js 15 (App Router)'",
+      "fix": "Update CLAUDE.md to reference Next.js 16."
+    },
+    {
+      "severity": "WARNING",
+      "issue": "2 console.log statements remain in production code",
+      "location": "src/app/(dashboard)/dashboard/family/tree/page.tsx, src/app/api/documents/[id]/process/route.ts",
+      "fix": "Remove or replace with proper logging."
+    }
+  ],
+
+  "code_quality": {
+    "typescript_errors": 0,
+    "todo_comments": 0,
+    "console_logs": 2,
+    "any_usage": 0
+  },
+
+  "supabase_status": {
+    "client_configured": true,
+    "types_generated": true,
+    "tables_typed": [
+      "profiles",
+      "family_members",
+      "family_relationships",
+      "documents",
+      "medicines",
+      "drug_interactions",
+      "glucose_readings",
+      "access_permissions"
+    ],
+    "edge_functions_present": false
+  },
+
+  "recommendations": [
+    {
+      "priority": 1,
+      "action": "Implement Glucose Tracking (Phase 6)",
+      "reason": "Database schema is ready. Dashboard already links to /dashboard/glucose causing 404. Needs actions, types, components (chart + form), and page route."
+    },
+    {
+      "priority": 2,
+      "action": "Activate PWA with next-pwa configuration",
+      "reason": "Dependency installed, manifest exists, but next.config.js has no PWA config. Missing service worker, offline page, and icon assets makes the app non-installable."
+    },
+    {
+      "priority": 3,
+      "action": "Implement Access Permissions server actions",
+      "reason": "access_permissions table is typed and ready but no server actions exist. Hierarchical access control is a key feature for family health management."
+    },
+    {
+      "priority": 4,
+      "action": "Add camera capture component for mobile prescription photos",
+      "reason": "Mobile users need camera capture for prescription scanning. Currently only file upload is available."
+    },
+    {
+      "priority": 5,
+      "action": "Update CLAUDE.md to reflect actual Next.js version (16.1.4)",
+      "reason": "Documentation accuracy - CLAUDE.md says Next.js 15 but actual version is 16.1.4."
+    },
+    {
+      "priority": 6,
+      "action": "Remove 2 console.log statements from production code",
+      "reason": "Clean code hygiene - only 2 instances but should use proper error logging."
+    },
+    {
+      "priority": 7,
+      "action": "Implement PDF text extraction",
+      "reason": "extractMedicinesFromPDF currently returns 'not yet supported'. Add pdf-parse or similar library for PDF prescription support."
+    }
+  ],
+
+  "raw_outputs": {
+    "section_a": "Root files: package.json, tsconfig.json, next.config.js, .env.local, .env.local.example, .gitignore, components.json, eslint.config.mjs, postcss.config.mjs, CLAUDE.md, LICENSE, next-env.d.ts, package-lock.json. Dependencies: 19 production (next@16.1.4, react@19.2.3, @supabase/ssr, @supabase/supabase-js, openai, next-pwa, next-themes, relatives-tree, lucide-react, 7 radix-ui packages, class-variance-authority, clsx, tailwind-merge). DevDependencies: 9 (@tailwindcss/postcss, @types/node, @types/react, @types/react-dom, eslint, eslint-config-next, tailwindcss, tw-animate-css, typescript). tsconfig: strict=true, target=ES2017, moduleResolution=bundler, paths=@/*->./src/*. next.config: reactStrictMode=true, devIndicators=false, PWA comment placeholder. Env vars: NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, NEXT_PUBLIC_SITE_URL, OPENAI_API_KEY.",
+    "section_b": "App routes (9 pages): /, (auth)/login, (auth)/signup, (dashboard)/dashboard, (dashboard)/dashboard/family, (dashboard)/dashboard/family/tree, (dashboard)/dashboard/documents, (dashboard)/dashboard/medicines, (dashboard)/dashboard/interactions. Layouts (3): root, auth, dashboard. Loading states (5): family, tree, documents, medicines, interactions. API routes (2): /api/documents/[id]/process, /auth/callback. Components (35 total): ui/ (12), layout/ (5), auth/ (2), family/ (7), documents/ (5), medicines/ (2), interactions/ (2). Actions (6): auth.ts, family.ts, relationships.ts, documents.ts, medicines.ts, interactions.ts. Lib (9): supabase/client.ts, supabase/server.ts, utils.ts, tree-utils.ts, openai.ts, extraction.ts, openfda.ts, interaction-gpt.ts, interactions.ts. Types (6): database.ts, family.ts, relationships.ts, documents.ts, medicines.ts, interactions.ts. Middleware: src/middleware.ts (76 lines).",
+    "section_c": "Supabase client.ts: EXISTS - createBrowserClient<Database> with env vars. Supabase server.ts: EXISTS - createServerClient<Database> with cookie management. Login page: EXISTS at src/app/(auth)/login/page.tsx - Card layout with error/success params, LoginForm component. Signup page: EXISTS at src/app/(auth)/signup/page.tsx - Card layout, SignupForm component. Root layout: EXISTS - metadata (title, manifest, appleWebApp), viewport (themeColor light/dark), Providers wrapper. Dashboard layout: EXISTS - Header + main content + MobileNav, responsive with container. Auth layout: EXISTS - Header + centered content. shadcn/ui: 12 components (alert, alert-dialog, avatar, badge, button, card, dialog, dropdown-menu, input, label, select, skeleton). Middleware: EXISTS (76 lines) - protects /dashboard/*, redirects auth pages.",
+    "section_d": "family.ts: EXISTS - exports getFamilyMembers, createFamilyMember, updateFamilyMember, deleteFamilyMember, addSelfAsFamilyMember, getFamilyMemberCount. relationships.ts: EXISTS - exports getRelationships, createRelationship, deleteRelationship, getInverseRelationship (bidirectional). access-permissions.ts: MISSING - no file found. family-tree.tsx: EXISTS - SVG rendering with relatives-tree library, NODE_WIDTH=120, NODE_HEIGHT=80. types/family.ts: EXISTS - FamilyMember, FamilyMemberInsert, FamilyMemberUpdate, FamilyActionState, FamilyMemberFormData. types/relationships.ts: EXISTS - FamilyRelationship, RelationshipType, TreeNode, RelationLink, RelationshipDisplay. Family page: EXISTS at src/app/(dashboard)/dashboard/family/page.tsx. Tree page: EXISTS at src/app/(dashboard)/dashboard/family/tree/page.tsx.",
+    "section_e": "documents.ts: EXISTS - exports getDocuments, createDocument, deleteDocument, getDocumentUrl. medicines.ts: EXISTS - exports getMedicinesByMember, getMedicinesByDocument, createMedicinesFromExtraction, toggleMedicineActive, deleteMedicine, getActiveMedicineCount. document-upload-dialog.tsx: EXISTS (named differently from expected upload-form.tsx) - drag-drop, file validation, member selection. camera-capture.tsx: MISSING. Edge function (supabase/functions/extract-medicines/): MISSING - uses API route instead. Documents page: EXISTS. API route: EXISTS at src/app/api/documents/[id]/process/route.ts - full OCR pipeline with auto-interaction check. extraction.ts: EXISTS - GPT-4o-mini vision, Indian prescription format support, PDF stub.",
+    "section_f": "openfda.ts: EXISTS - checkInteractionOpenFDA(), cleans drug names, bidirectional search, severity inference from keywords, 24h cache. interaction-gpt.ts: EXISTS - checkInteractionGPT(), pharmacist prompt, conservative approach, JSON parsing, disclaimer. interactions.ts (lib): EXISTS - checkInteraction() (OpenFDA->GPT fallback), checkAllInteractions() (batch 3 pairs, 500ms delay). interactions.ts (actions): EXISTS - getUnacknowledgedInteractions, getUnacknowledgedInteractionCount, checkMemberInteractions, acknowledgeInteraction. interaction-alert.tsx: EXISTS - count display, Review Now button, singular/plural grammar. Interactions page: EXISTS - auth check, medical disclaimer, InteractionCard list, empty state.",
+    "section_g": "glucose.ts (actions): MISSING. glucose.ts (types): MISSING. glucose_readings table: EXISTS in database.types.ts (lines 241-284) with columns id, owner_id, value, unit, reading_type, recorded_at, meal_context, notes, created_at. Enums: reading_type (fasting, pre_meal, post_meal, random, bedtime), meal_context (breakfast, lunch, dinner, snack, none). glucose-chart.tsx: MISSING. reading-form.tsx: MISSING. Glucose page: MISSING (dashboard links to /dashboard/glucose but page does not exist).",
+    "section_h": "next.config.js: EXISTS but NO PWA CONFIG (comment 'Phase 6'). next-pwa: v5.6.0 in dependencies but unused. manifest.json: EXISTS (name: smart-med, display: standalone, start_url: /dashboard, theme_color: #0d9488, icons: 192x192 + 512x512 referenced). sw.js: MISSING. offline.html: MISSING. offline page route: MISSING. public/icons/: EXISTS but EMPTY (only .gitkeep). install-prompt.tsx: MISSING.",
+    "section_i": "TypeScript errors: 0 (npx tsc --noEmit clean). TODO/FIXME comments: 0. console.log: 2 (family/tree/page.tsx, api/documents/[id]/process/route.ts). console.error: 26 (across actions and API routes - appropriate). console.warn: 1. any usage: 0.",
+    "section_j": "database.types.ts: EXISTS (519 lines). Tables typed (8): profiles, family_members, family_relationships, documents, medicines, drug_interactions, glucose_readings, access_permissions. Each has Row, Insert, Update types. Enums (7): document_status, gender, interaction_severity, meal_context, permission_level, reading_type, relationship_type. Helper exports: Tables<T>, TablesInsert<T>, TablesUpdate<T>, Enums<T>, convenience aliases. config.toml: MISSING. Supabase clients: EXISTS (client.ts + server.ts in src/lib/supabase/)."
+  }
+}

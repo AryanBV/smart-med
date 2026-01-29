@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import calcTree from "relatives-tree";
 import type { ExtNode, Gender, RelType } from "relatives-tree/lib/types";
 import type { FamilyMember } from "@/types/family";
-import type { RelationshipDisplay, TreeNode } from "@/types/relationships";
+import type { RelationshipDisplay } from "@/types/relationships";
 import { transformToTreeNodes, findRootNode } from "@/lib/tree-utils";
 import { cn } from "@/lib/utils";
 
