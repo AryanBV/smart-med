@@ -200,6 +200,7 @@ export default async function DashboardPage() {
               </p>
             </div>
           </Link>
+{/* Phase 6: Glucose Tracking - Coming Soon
           <Link
             href="/dashboard/glucose"
             className="flex items-center gap-3 rounded-lg border p-4 hover:bg-muted/50 transition-colors"
@@ -214,6 +215,7 @@ export default async function DashboardPage() {
               </p>
             </div>
           </Link>
+          */}
         </div>
       </div>
     </div>
