@@ -59,23 +59,26 @@ export async function POST(
       return NextResponse.json({ error: "Access denied" }, { status: 403 });
     }
 
-    if (document.ocr_status === "completed") {
-      return NextResponse.json(
-        { error: "Document already processed" },
-        { status: 400 }
-      );
-    }
-
-    // Update status to processing
-    await supabase
+    // Atomic check-and-update in single operation
+    const { data: updated, error: updateError } = await supabase
       .from("documents")
       .update({ ocr_status: "processing" })
-      .eq("id", documentId);
+      .eq("id", documentId)
+      .eq("ocr_status", "pending") // Only update if still pending
+      .select()
+      .single();
+
+    if (updateError || !updated) {
+      return NextResponse.json(
+        { error: "Document already processing or completed" },
+        { status: 409 }
+      );
+    }
 
     // Download file from storage
     const { data: fileData, error: downloadError } = await supabase.storage
       .from("prescriptions")
-      .download(document.file_path);
+      .download(updated.file_path);
 
     if (downloadError || !fileData) {
       await supabase
@@ -97,10 +100,10 @@ export async function POST(
     const base64 = Buffer.from(arrayBuffer).toString("base64");
 
     // Extract medicines
-    const isPdf = document.file_type === "application/pdf";
+    const isPdf = updated.file_type === "application/pdf";
     const extraction = isPdf
       ? await extractMedicinesFromPDF()
-      : await extractMedicinesFromImage(base64, document.file_type);
+      : await extractMedicinesFromImage(base64, updated.file_type);
 
     if (!extraction.success) {
       await supabase
@@ -125,7 +128,7 @@ export async function POST(
     if (extraction.medicines.length > 0) {
       const result = await createMedicinesFromExtraction(
         documentId,
-        document.owner_id,
+        updated.owner_id,
         extraction.medicines
       );
 
@@ -147,7 +150,7 @@ export async function POST(
 
       // Auto-check for drug interactions
       try {
-        const interactionResult = await checkMemberInteractions(document.owner_id);
+        const interactionResult = await checkMemberInteractions(updated.owner_id);
         console.log(`Interaction check: ${interactionResult.interactionsFound} found, ${interactionResult.newInteractions} new`);
       } catch (interactionError) {
         // Don't fail the whole request if interaction check fails
