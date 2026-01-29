@@ -1,7 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getAuthenticatedUser } from "@/lib/supabase/server";
+import { getAuthenticatedUser, type AuthSuccess } from "@/lib/supabase/server";
+import { familyMemberSchema } from "@/lib/schemas/family";
 import type { FamilyActionState, FamilyMember } from "@/types/family";
 import type { Gender } from "@/types/database";
 
@@ -13,7 +14,7 @@ export async function getFamilyMembers(): Promise<{
   if (authResult.error) {
     return { error: authResult.error, data: [] };
   }
-  const { supabase, user } = authResult;
+  const { supabase, user } = authResult as AuthSuccess;
 
   const { data, error } = await supabase
     .from("family_members")
@@ -31,7 +32,7 @@ export async function getFamilyMembers(): Promise<{
 export async function getFamilyMemberCount(): Promise<number> {
   const authResult = await getAuthenticatedUser();
   if (authResult.error) return 0;
-  const { supabase, user } = authResult;
+  const { supabase, user } = authResult as AuthSuccess;
 
   const { count, error } = await supabase
     .from("family_members")
@@ -50,24 +51,30 @@ export async function createFamilyMember(
   if (authResult.error) {
     return { error: authResult.error };
   }
-  const { supabase, user } = authResult;
+  const { supabase, user } = authResult as AuthSuccess;
 
   const full_name = formData.get("full_name") as string;
   const date_of_birth = formData.get("date_of_birth") as string | null;
   const gender = formData.get("gender") as string | null;
 
-  // Validation
-  if (!full_name || full_name.trim().length < 2) {
-    return { error: "Name must be at least 2 characters" };
+  // Zod validation
+  const parsed = familyMemberSchema.safeParse({
+    full_name,
+    date_of_birth: date_of_birth || null,
+    gender: gender || null,
+  });
+
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0].message };
   }
 
   const { data, error } = await supabase
     .from("family_members")
     .insert({
       created_by: user.id,
-      full_name: full_name.trim(),
-      date_of_birth: date_of_birth || null,
-      gender: (gender as Gender) || null,
+      full_name: parsed.data.full_name.trim(),
+      date_of_birth: parsed.data.date_of_birth || null,
+      gender: (parsed.data.gender as Gender) || null,
       is_registered: false,
     })
     .select()
@@ -92,23 +99,29 @@ export async function updateFamilyMember(
   if (authResult.error) {
     return { error: authResult.error };
   }
-  const { supabase, user } = authResult;
+  const { supabase, user } = authResult as AuthSuccess;
 
   const full_name = formData.get("full_name") as string;
   const date_of_birth = formData.get("date_of_birth") as string | null;
   const gender = formData.get("gender") as string | null;
 
-  // Validation
-  if (!full_name || full_name.trim().length < 2) {
-    return { error: "Name must be at least 2 characters" };
+  // Zod validation
+  const parsed = familyMemberSchema.safeParse({
+    full_name,
+    date_of_birth: date_of_birth || null,
+    gender: gender || null,
+  });
+
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0].message };
   }
 
   const { data, error } = await supabase
     .from("family_members")
     .update({
-      full_name: full_name.trim(),
-      date_of_birth: date_of_birth || null,
-      gender: (gender as Gender) || null,
+      full_name: parsed.data.full_name.trim(),
+      date_of_birth: parsed.data.date_of_birth || null,
+      gender: (parsed.data.gender as Gender) || null,
     })
     .eq("id", memberId)
     .eq("created_by", user.id) // Security: only update own family members
@@ -132,7 +145,7 @@ export async function deleteFamilyMember(
   if (authResult.error) {
     return { error: authResult.error };
   }
-  const { supabase, user } = authResult;
+  const { supabase, user } = authResult as AuthSuccess;
 
   const { error } = await supabase
     .from("family_members")
@@ -155,7 +168,7 @@ export async function addSelfAsFamilyMember(): Promise<FamilyActionState> {
   if (authResult.error) {
     return { error: authResult.error };
   }
-  const { supabase, user } = authResult;
+  const { supabase, user } = authResult as AuthSuccess;
 
   // Get user's profile for name
   const { data: profile } = await supabase

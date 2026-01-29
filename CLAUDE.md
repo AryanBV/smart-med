@@ -7,11 +7,12 @@ Family health management PWA with OCR-powered medicine extraction and drug inter
 - **Framework**: Next.js 15 (App Router)
 - **Language**: TypeScript (strict)
 - **Styling**: Tailwind CSS v4 + shadcn/ui
-- **Database**: Supabase (Postgres)
+- **Database**: Supabase (Postgres with RLS)
 - **Auth**: Supabase Auth (Email + Google OAuth)
 - **Storage**: Supabase Storage
-- **OCR**: Tesseract.js + GPT-4o-mini
+- **OCR**: GPT-4o-mini (vision)
 - **Family Tree**: relatives-tree (layout calculation)
+- **Validation**: Zod schemas
 - **PWA**: next-pwa
 
 ## Design System
@@ -30,22 +31,28 @@ src/
 │   └── api/          # API routes
 ├── components/
 │   ├── ui/           # shadcn/ui components
-│   └── layout/       # Layout components
+│   ├── documents/    # Document management
+│   ├── family/       # Family tree & members
+│   ├── glucose/      # Glucose tracking
+│   ├── interactions/ # Drug interactions
+│   └── medicines/    # Medicine management
 ├── lib/
 │   ├── supabase/     # Supabase clients
+│   ├── schemas/      # Zod validation schemas
 │   └── utils.ts      # Utility functions
 ├── hooks/            # Custom React hooks
 ├── actions/          # Server Actions
 └── types/            # TypeScript types
 ```
 
-## Key Features (To Be Implemented)
+## Key Features
 1. ~~Family tree with complex relationships~~ ✅
 2. ~~Document upload with OCR~~ ✅
 3. ~~Medicine extraction (GPT-4o-mini)~~ ✅
-4. Drug interaction checking (OpenFDA)
-5. Blood glucose tracking
-6. Hierarchical access control
+4. ~~Drug interaction checking (OpenFDA)~~ ✅
+5. ~~Blood glucose tracking~~ ✅
+6. ~~PWA with offline support~~ ✅
+7. Hierarchical access control - Deferred (table exists, not integrated)
 
 ### Family Tree (Phase 3B) ✅
 - Interactive family tree visualization with zoom/pan
@@ -55,13 +62,14 @@ src/
 - Mobile-friendly with touch support
 
 ### Document Management (Phase 4A) ✅
-- Upload documents (JPG, PNG, WebP, PDF) up to 10MB
+- Upload documents (JPG, PNG, WebP) up to 10MB
 - Drag-and-drop upload interface
-- Document list with file preview icons
+- Document list with pagination
 - View documents via signed URLs
 - Delete documents with confirmation
 - OCR status tracking (pending → processed)
 - Documents linked to family members
+- **Note**: PDF upload disabled until extraction support is added
 
 ### Medicine Extraction (Phase 4B) ✅
 - GPT-4o-mini vision for prescription OCR
@@ -81,6 +89,27 @@ src/
 - Medical disclaimer on all interaction information
 - Interactions page showing all warnings
 
+### Glucose Tracking (Phase 6) ✅
+- Log blood sugar readings with family member selection
+- Reading types: fasting, pre-meal, post-meal, random, bedtime
+- Meal context tracking (breakfast, lunch, dinner, snack)
+- Color-coded values based on glucose ranges
+- Statistics: average, fasting average, range, in-target percentage
+- Trend chart showing last 30 readings
+- Delete readings with confirmation
+
+### PWA (Phase 7) ✅
+- Service worker with next-pwa
+- Offline fallback page
+- Installable on mobile devices
+
+## Security Features
+- Row Level Security (RLS) on all 8 database tables
+- UUID validation on all inputs
+- Zod schema validation on forms
+- Rate limiting on API routes (10 req/min for document processing)
+- Ownership verification in all server actions
+
 ## Development Phases
 - Phase 1: Foundation ✅
 - Phase 2A: Database Schema ✅
@@ -90,12 +119,13 @@ src/
 - Phase 4A: Document Upload & Storage ✅
 - Phase 4B: OCR & Medicine Extraction ✅
 - Phase 5: Drug Interactions ✅
-- Phase 6: Glucose Tracking
-- Phase 7: PWA Polish
+- Phase 6: Glucose Tracking ✅
+- Phase 7: PWA Polish ✅
 
 ## Commands
 - `npm run dev` - Start development server
 - `npm run build` - Build for production
+- `npm run start` - Start production server
 - `npm run lint` - Run ESLint
 
 ## Environment Variables
@@ -104,3 +134,9 @@ Required in `.env.local`:
 - NEXT_PUBLIC_SUPABASE_ANON_KEY
 - SUPABASE_SERVICE_ROLE_KEY
 - OPENAI_API_KEY
+- NEXT_PUBLIC_SITE_URL
+
+## Known Limitations
+- PDF extraction not yet supported (images only)
+- access_permissions table exists but not yet integrated in application layer
+- Middleware deprecation warning in Next.js 16 (proxy convention)

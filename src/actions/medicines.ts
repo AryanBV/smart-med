@@ -1,6 +1,6 @@
 "use server";
 
-import { getAuthenticatedUser } from "@/lib/supabase/server";
+import { getAuthenticatedUser, type AuthSuccess } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import type {
   MedicineDisplay,
@@ -17,7 +17,7 @@ export async function getMedicinesByMember(memberId: string): Promise<{
   if (authResult.error) {
     return { data: null, error: authResult.error };
   }
-  const { supabase, user } = authResult;
+  const { supabase, user } = authResult as AuthSuccess;
 
   const { data: member } = await supabase
     .from("family_members")
@@ -66,7 +66,7 @@ export async function getMedicinesByDocument(documentId: string): Promise<{
   if (authResult.error) {
     return { data: null, error: authResult.error };
   }
-  const { supabase, user } = authResult;
+  const { supabase, user } = authResult as AuthSuccess;
 
   // Get medicines with owner info
   const { data: medicines, error } = await supabase
@@ -119,7 +119,7 @@ export async function getMedicinesByDocument(documentId: string): Promise<{
 export async function getActiveMedicineCount(): Promise<number> {
   const authResult = await getAuthenticatedUser();
   if (authResult.error) return 0;
-  const { supabase, user } = authResult;
+  const { supabase, user } = authResult as AuthSuccess;
 
   const { data: members } = await supabase
     .from("family_members")
@@ -154,7 +154,7 @@ export async function createMedicinesFromExtraction(
   if (authResult.error) {
     return { success: false, error: authResult.error };
   }
-  const { supabase, user } = authResult;
+  const { supabase, user } = authResult as AuthSuccess;
 
   const { data: member } = await supabase
     .from("family_members")
@@ -199,7 +199,7 @@ export async function toggleMedicineActive(
   if (authResult.error) {
     return { success: false, error: authResult.error };
   }
-  const { supabase, user } = authResult;
+  const { supabase, user } = authResult as AuthSuccess;
 
   // Get medicine
   const { data: medicine, error: fetchError } = await supabase
@@ -247,7 +247,7 @@ export async function deleteMedicine(
   if (authResult.error) {
     return { success: false, error: authResult.error };
   }
-  const { supabase, user } = authResult;
+  const { supabase, user } = authResult as AuthSuccess;
 
   // Get medicine with ownership check
   const { data: medicine } = await supabase

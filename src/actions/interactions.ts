@@ -1,6 +1,6 @@
 "use server";
 
-import { getAuthenticatedUser } from "@/lib/supabase/server";
+import { getAuthenticatedUser, type AuthSuccess } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { checkAllInteractions } from "@/lib/interactions";
 import { validateUUIDs } from "@/lib/utils";
@@ -20,7 +20,7 @@ export async function getUnacknowledgedInteractions(): Promise<{
   if (authResult.error) {
     return { data: null, error: authResult.error };
   }
-  const { supabase, user } = authResult;
+  const { supabase, user } = authResult as AuthSuccess;
 
   // Get user's family members
   const { data: members } = await supabase
@@ -107,7 +107,7 @@ export async function getUnacknowledgedInteractions(): Promise<{
 export async function getUnacknowledgedInteractionCount(): Promise<number> {
   const authResult = await getAuthenticatedUser();
   if (authResult.error) return 0;
-  const { supabase, user } = authResult;
+  const { supabase, user } = authResult as AuthSuccess;
 
   // Get user's family members
   const { data: members } = await supabase
@@ -156,7 +156,7 @@ export async function checkMemberInteractions(
   if (authResult.error) {
     return { success: false, interactionsFound: 0, newInteractions: 0, error: authResult.error };
   }
-  const { supabase, user } = authResult;
+  const { supabase, user } = authResult as AuthSuccess;
 
   // Verify member belongs to user
   const { data: member } = await supabase
@@ -268,7 +268,7 @@ export async function acknowledgeInteraction(
   if (authResult.error) {
     return { success: false, error: authResult.error };
   }
-  const { supabase, user } = authResult;
+  const { supabase, user } = authResult as AuthSuccess;
 
   // Get interaction
   const { data: interaction } = await supabase

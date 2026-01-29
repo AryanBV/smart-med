@@ -7,6 +7,7 @@ import {
 import { createMedicinesFromExtraction } from "@/actions/medicines";
 import { checkMemberInteractions } from "@/actions/interactions";
 import { isOpenAIConfigured } from "@/lib/openai";
+import { rateLimit } from "@/lib/rate-limit";
 
 export async function POST(
   request: NextRequest,
@@ -32,6 +33,23 @@ export async function POST(
     } = await supabase.auth.getUser();
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
+
+    // Rate limiting: 10 requests per minute per user
+    const rateLimitResult = rateLimit(`process:${user.id}`, 10, 60000);
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        {
+          error: "Rate limit exceeded. Please try again in a minute.",
+          retryAfter: Math.ceil(rateLimitResult.resetIn / 1000),
+        },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(Math.ceil(rateLimitResult.resetIn / 1000)),
+          },
+        }
+      );
     }
 
     // Get document

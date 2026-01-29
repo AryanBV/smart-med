@@ -24,30 +24,23 @@ async function getStats(userId: string) {
     };
   }
 
-  // Run remaining counts in parallel
-  const [familyResult, docsResult, medsResult, medsForInteractions] =
-    await Promise.all([
-      supabase
-        .from("family_members")
-        .select("*", { count: "exact", head: true })
-        .eq("created_by", userId),
-      supabase
-        .from("documents")
-        .select("*", { count: "exact", head: true })
-        .in("owner_id", memberIds),
-      supabase
-        .from("medicines")
-        .select("*", { count: "exact", head: true })
-        .in("owner_id", memberIds)
-        .eq("is_active", true),
-      supabase
-        .from("medicines")
-        .select("id")
-        .in("owner_id", memberIds)
-        .eq("is_active", true),
-    ]);
+  // Run remaining counts in parallel (optimized: combined medicine count + IDs query)
+  const [docsResult, medsResult] = await Promise.all([
+    supabase
+      .from("documents")
+      .select("*", { count: "exact", head: true })
+      .in("owner_id", memberIds),
+    // Single query returns both count and IDs (removed duplicate query)
+    supabase
+      .from("medicines")
+      .select("id", { count: "exact" })
+      .in("owner_id", memberIds)
+      .eq("is_active", true),
+  ]);
 
-  const medicineIds = medsForInteractions.data?.map((m) => m.id) ?? [];
+  // familyCount is already known from members.length
+  const familyCount = memberIds.length;
+  const medicineIds = medsResult.data?.map((m) => m.id) ?? [];
 
   let interactionCount = 0;
   if (medicineIds.length > 0) {
@@ -62,7 +55,7 @@ async function getStats(userId: string) {
   }
 
   return {
-    familyCount: familyResult.count ?? 0,
+    familyCount,
     documentCount: docsResult.count ?? 0,
     medicineCount: medsResult.count ?? 0,
     interactionCount,
@@ -204,7 +197,6 @@ export default async function DashboardPage() {
               </p>
             </div>
           </Link>
-{/* Phase 6: Glucose Tracking - Coming Soon
           <Link
             href="/dashboard/glucose"
             className="flex items-center gap-3 rounded-lg border p-4 hover:bg-muted/50 transition-colors"
@@ -219,7 +211,6 @@ export default async function DashboardPage() {
               </p>
             </div>
           </Link>
-          */}
         </div>
       </div>
     </div>

@@ -1,6 +1,6 @@
 "use server";
 
-import { getAuthenticatedUser } from "@/lib/supabase/server";
+import { getAuthenticatedUser, type AuthSuccess } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import type { RelationshipFormState, RelationshipType, RelationshipDisplay } from "@/types/relationships";
 
@@ -13,7 +13,7 @@ export async function getRelationships(): Promise<{
   if (authResult.error) {
     return { data: null, error: authResult.error };
   }
-  const { supabase, user } = authResult;
+  const { supabase, user } = authResult as AuthSuccess;
 
   // Get relationships
   const { data: relationships, error: relError } = await supabase
@@ -66,7 +66,7 @@ export async function createRelationship(
   if (authResult.error) {
     return { success: false, error: authResult.error };
   }
-  const { supabase, user } = authResult;
+  const { supabase, user } = authResult as AuthSuccess;
 
   // Validate: can't relate to self
   if (memberId === relatedMemberId) {
@@ -124,7 +124,7 @@ export async function deleteRelationship(
   if (authResult.error) {
     return { success: false, error: authResult.error };
   }
-  const { supabase, user } = authResult;
+  const { supabase, user } = authResult as AuthSuccess;
 
   // Verify members belong to user before deleting
   const { data: members } = await supabase

@@ -8,14 +8,19 @@ import type {
   DocumentUploadData,
 } from "@/types/documents";
 
-// Get all documents for current user (via family members)
-export async function getDocuments(): Promise<{
+// Get documents for current user with pagination
+export async function getDocuments(
+  page: number = 1,
+  pageSize: number = 20
+): Promise<{
   error?: string;
   data: DocumentWithOwner[];
+  totalCount: number;
+  hasMore: boolean;
 }> {
   const authResult = await getAuthenticatedUser();
   if (authResult.error) {
-    return { error: authResult.error, data: [] };
+    return { error: authResult.error, data: [], totalCount: 0, hasMore: false };
   }
   const { supabase, user } = authResult as AuthSuccess;
 
@@ -26,29 +31,35 @@ export async function getDocuments(): Promise<{
     .eq("created_by", user.id);
 
   if (familyError) {
-    return { error: familyError.message, data: [] };
+    return { error: familyError.message, data: [], totalCount: 0, hasMore: false };
   }
 
   if (!familyMembers || familyMembers.length === 0) {
-    return { data: [] };
+    return { data: [], totalCount: 0, hasMore: false };
   }
 
   const memberIds = familyMembers.map((m) => m.id);
 
-  // Get documents with owner info
-  const { data, error } = await supabase
+  // Calculate pagination range
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+
+  // Get documents with owner info (with count)
+  const { data, error, count } = await supabase
     .from("documents")
     .select(
       `
       *,
       owner:family_members!inner(id, full_name)
-    `
+    `,
+      { count: "exact" }
     )
     .in("owner_id", memberIds)
-    .order("uploaded_at", { ascending: false });
+    .order("uploaded_at", { ascending: false })
+    .range(from, to);
 
   if (error) {
-    return { error: error.message, data: [] };
+    return { error: error.message, data: [], totalCount: 0, hasMore: false };
   }
 
   // Transform to match DocumentWithOwner type
@@ -57,7 +68,10 @@ export async function getDocuments(): Promise<{
     owner: doc.owner as { id: string; full_name: string },
   }));
 
-  return { data: documents };
+  const totalCount = count ?? 0;
+  const hasMore = totalCount > to + 1;
+
+  return { data: documents, totalCount, hasMore };
 }
 
 // Create document record (called after successful storage upload)
@@ -68,7 +82,7 @@ export async function createDocument(
   if (authResult.error) {
     return { error: authResult.error };
   }
-  const { supabase, user } = authResult;
+  const { supabase, user } = authResult as AuthSuccess;
 
   // Verify owner_id belongs to user's family (defense in depth beyond RLS)
   const { data: familyMember, error: memberError } = await supabase
@@ -113,7 +127,7 @@ export async function deleteDocument(
   if (authResult.error) {
     return { error: authResult.error };
   }
-  const { supabase, user } = authResult;
+  const { supabase, user } = authResult as AuthSuccess;
 
   // Get document with ownership check via family_members join
   const { data: doc, error: fetchError } = await supabase
@@ -172,7 +186,7 @@ export async function getDocumentUrl(
   if (authResult.error) {
     return { error: authResult.error };
   }
-  const { supabase, user } = authResult;
+  const { supabase, user } = authResult as AuthSuccess;
 
   // Verify user owns this file path (path starts with user ID)
   if (!filePath.startsWith(user.id)) {
