@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   FileText,
   Image as ImageIcon,
@@ -36,6 +37,7 @@ interface DocumentCardProps {
 }
 
 export function DocumentCard({ document }: DocumentCardProps) {
+  const router = useRouter();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isLoadingUrl, setIsLoadingUrl] = useState(false);
@@ -98,7 +100,7 @@ export function DocumentCard({ document }: DocumentCardProps) {
       }
 
       // Success - refresh page to show updated status
-      window.location.reload();
+      router.refresh();
     } catch (error) {
       console.error("Process error:", error);
       setExtractionError("Failed to process document");
