@@ -311,6 +311,7 @@ export function FamilyTree({ members, relationships, onNodeClick }: FamilyTreePr
               role="button"
               tabIndex={0}
               onKeyDown={(e) => e.key === "Enter" && onNodeClick?.(node.id)}
+              aria-label={`${node.displayName}, ${node.gender === 'female' ? 'Female' : 'Male'} family member`}
             >
               {/* Node background */}
               <rect

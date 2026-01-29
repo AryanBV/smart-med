@@ -27,10 +27,11 @@ export function MobileNav() {
             <Link
               key={item.href}
               href={item.href}
+              aria-current={isActive ? "page" : undefined}
               className={cn(
                 "flex flex-col items-center justify-center w-full h-full min-h-[44px] min-w-[44px]",
                 "text-muted-foreground hover:text-primary",
-                isActive && "text-primary"
+                isActive && "text-primary font-medium"
               )}
             >
               <Icon className="h-5 w-5" />
