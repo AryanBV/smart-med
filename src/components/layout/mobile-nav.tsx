@@ -2,15 +2,15 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Users, FileText, Pill, Activity } from "lucide-react";
+import { Home, Users, FileText, Pill, GitBranch } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/dashboard", label: "Home", icon: Home },
   { href: "/dashboard/family", label: "Family", icon: Users },
+  { href: "/dashboard/family/tree", label: "Tree", icon: GitBranch },
   { href: "/dashboard/documents", label: "Docs", icon: FileText },
   { href: "/dashboard/medicines", label: "Meds", icon: Pill },
-  { href: "/dashboard/glucose", label: "Glucose", icon: Activity },
 ];
 
 export function MobileNav() {
@@ -29,12 +29,15 @@ export function MobileNav() {
               href={item.href}
               aria-current={isActive ? "page" : undefined}
               className={cn(
-                "flex flex-col items-center justify-center w-full h-full min-h-[44px] min-w-[44px]",
-                "text-muted-foreground hover:text-primary",
+                "relative flex flex-col items-center justify-center w-full h-full min-h-[44px] min-w-[44px]",
+                "text-muted-foreground hover:text-primary transition-all duration-150",
                 isActive && "text-primary font-medium"
               )}
             >
-              <Icon className="h-5 w-5" />
+              {isActive && (
+                <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-1 bg-primary rounded-b-full" />
+              )}
+              <Icon className={cn("h-5 w-5 transition-transform", isActive && "scale-110")} />
               <span className="text-xs mt-1">{item.label}</span>
             </Link>
           );

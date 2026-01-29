@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { Users, FileText, Pill, AlertTriangle } from "lucide-react";
+import { Users, FileText, Pill, AlertTriangle, GitBranch } from "lucide-react";
 import Link from "next/link";
 import { InteractionAlert } from "@/components/interactions/interaction-alert";
 
@@ -94,7 +94,7 @@ export default async function DashboardPage() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Link
           href="/dashboard/family"
-          className="rounded-lg border bg-card p-6 hover:shadow-md transition-shadow"
+          className="rounded-xl border bg-card p-6 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-200"
         >
           <div className="flex items-center gap-2">
             <Users className="h-5 w-5 text-primary" />
@@ -112,7 +112,7 @@ export default async function DashboardPage() {
 
         <Link
           href="/dashboard/documents"
-          className="rounded-lg border bg-card p-6 hover:shadow-md transition-shadow"
+          className="rounded-xl border bg-card p-6 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-200"
         >
           <div className="flex items-center gap-2">
             <FileText className="h-5 w-5 text-primary" />
@@ -128,7 +128,7 @@ export default async function DashboardPage() {
 
         <Link
           href="/dashboard/medicines"
-          className="rounded-lg border bg-card p-6 hover:shadow-md transition-shadow"
+          className="rounded-xl border bg-card p-6 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-200"
         >
           <div className="flex items-center gap-2">
             <Pill className="h-5 w-5 text-primary" />
@@ -142,7 +142,7 @@ export default async function DashboardPage() {
           </p>
         </Link>
 
-        <div className="rounded-lg border bg-card p-6">
+        <div className="rounded-xl border bg-card p-6 shadow-sm">
           <div className="flex items-center gap-2">
             <AlertTriangle
               className={`h-5 w-5 ${
@@ -198,16 +198,16 @@ export default async function DashboardPage() {
             </div>
           </Link>
           <Link
-            href="/dashboard/glucose"
+            href="/dashboard/family/tree"
             className="flex items-center gap-3 rounded-lg border p-4 hover:bg-muted/50 transition-colors"
           >
             <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-              <Pill className="h-5 w-5 text-primary" />
+              <GitBranch className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <p className="font-medium">Log Glucose</p>
+              <p className="font-medium">View Family Tree</p>
               <p className="text-sm text-muted-foreground">
-                Track blood sugar levels
+                Visualize relationships
               </p>
             </div>
           </Link>

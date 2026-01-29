@@ -10,7 +10,9 @@ export default function DashboardLayout({
     <div className="min-h-screen flex flex-col">
       <Header />
       <main className="flex-1 container mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-20 md:pb-6">
-        {children}
+        <div className="animate-in fade-in-0 slide-in-from-bottom-2 duration-300">
+          {children}
+        </div>
       </main>
       <MobileNav />
     </div>
