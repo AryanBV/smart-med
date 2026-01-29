@@ -1,6 +1,6 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { getAuthenticatedUser } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import type { RelationshipFormState, RelationshipType, RelationshipDisplay } from "@/types/relationships";
 
@@ -9,12 +9,11 @@ export async function getRelationships(): Promise<{
   data: RelationshipDisplay[] | null;
   error: string | null;
 }> {
-  const supabase = await createClient();
-
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return { data: null, error: "Not authenticated" };
+  const authResult = await getAuthenticatedUser();
+  if (authResult.error) {
+    return { data: null, error: authResult.error };
   }
+  const { supabase, user } = authResult;
 
   // Get relationships
   const { data: relationships, error: relError } = await supabase
@@ -63,12 +62,11 @@ export async function createRelationship(
   relatedMemberId: string,
   relationshipType: RelationshipType
 ): Promise<RelationshipFormState> {
-  const supabase = await createClient();
-
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return { success: false, error: "Not authenticated" };
+  const authResult = await getAuthenticatedUser();
+  if (authResult.error) {
+    return { success: false, error: authResult.error };
   }
+  const { supabase, user } = authResult;
 
   // Validate: can't relate to self
   if (memberId === relatedMemberId) {
@@ -122,12 +120,11 @@ export async function deleteRelationship(
   memberId: string,
   relatedMemberId: string
 ): Promise<RelationshipFormState> {
-  const supabase = await createClient();
-
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return { success: false, error: "Not authenticated" };
+  const authResult = await getAuthenticatedUser();
+  if (authResult.error) {
+    return { success: false, error: authResult.error };
   }
+  const { supabase, user } = authResult;
 
   // Verify members belong to user before deleting
   const { data: members } = await supabase

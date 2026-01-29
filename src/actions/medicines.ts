@@ -1,6 +1,6 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { getAuthenticatedUser } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import type {
   MedicineDisplay,
@@ -13,14 +13,11 @@ export async function getMedicinesByMember(memberId: string): Promise<{
   data: MedicineDisplay[] | null;
   error: string | null;
 }> {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return { data: null, error: "Not authenticated" };
+  const authResult = await getAuthenticatedUser();
+  if (authResult.error) {
+    return { data: null, error: authResult.error };
   }
+  const { supabase, user } = authResult;
 
   const { data: member } = await supabase
     .from("family_members")
@@ -65,14 +62,11 @@ export async function getMedicinesByDocument(documentId: string): Promise<{
   data: MedicineDisplay[] | null;
   error: string | null;
 }> {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return { data: null, error: "Not authenticated" };
+  const authResult = await getAuthenticatedUser();
+  if (authResult.error) {
+    return { data: null, error: authResult.error };
   }
+  const { supabase, user } = authResult;
 
   // Get medicines with owner info
   const { data: medicines, error } = await supabase
@@ -123,12 +117,9 @@ export async function getMedicinesByDocument(documentId: string): Promise<{
 
 // Get active medicine count for dashboard
 export async function getActiveMedicineCount(): Promise<number> {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return 0;
+  const authResult = await getAuthenticatedUser();
+  if (authResult.error) return 0;
+  const { supabase, user } = authResult;
 
   const { data: members } = await supabase
     .from("family_members")
@@ -159,14 +150,11 @@ export async function createMedicinesFromExtraction(
   ownerId: string,
   medicines: ExtractedMedicine[]
 ): Promise<MedicineActionState> {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return { success: false, error: "Not authenticated" };
+  const authResult = await getAuthenticatedUser();
+  if (authResult.error) {
+    return { success: false, error: authResult.error };
   }
+  const { supabase, user } = authResult;
 
   const { data: member } = await supabase
     .from("family_members")
@@ -207,14 +195,11 @@ export async function createMedicinesFromExtraction(
 export async function toggleMedicineActive(
   medicineId: string
 ): Promise<MedicineActionState> {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return { success: false, error: "Not authenticated" };
+  const authResult = await getAuthenticatedUser();
+  if (authResult.error) {
+    return { success: false, error: authResult.error };
   }
+  const { supabase, user } = authResult;
 
   // Get medicine
   const { data: medicine, error: fetchError } = await supabase
@@ -258,14 +243,11 @@ export async function toggleMedicineActive(
 export async function deleteMedicine(
   medicineId: string
 ): Promise<MedicineActionState> {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return { success: false, error: "Not authenticated" };
+  const authResult = await getAuthenticatedUser();
+  if (authResult.error) {
+    return { success: false, error: authResult.error };
   }
+  const { supabase, user } = authResult;
 
   // Get medicine with ownership check
   const { data: medicine } = await supabase

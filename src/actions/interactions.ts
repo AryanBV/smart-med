@@ -1,6 +1,6 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { getAuthenticatedUser } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { checkAllInteractions } from "@/lib/interactions";
 import { validateUUIDs } from "@/lib/utils";
@@ -16,12 +16,11 @@ export async function getUnacknowledgedInteractions(): Promise<{
   data: InteractionDisplay[] | null;
   error: string | null;
 }> {
-  const supabase = await createClient();
-
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return { data: null, error: "Not authenticated" };
+  const authResult = await getAuthenticatedUser();
+  if (authResult.error) {
+    return { data: null, error: authResult.error };
   }
+  const { supabase, user } = authResult;
 
   // Get user's family members
   const { data: members } = await supabase
@@ -106,10 +105,9 @@ export async function getUnacknowledgedInteractions(): Promise<{
 
 // Get interaction count for dashboard
 export async function getUnacknowledgedInteractionCount(): Promise<number> {
-  const supabase = await createClient();
-
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return 0;
+  const authResult = await getAuthenticatedUser();
+  if (authResult.error) return 0;
+  const { supabase, user } = authResult;
 
   // Get user's family members
   const { data: members } = await supabase
@@ -154,12 +152,11 @@ export async function getUnacknowledgedInteractionCount(): Promise<number> {
 export async function checkMemberInteractions(
   memberId: string
 ): Promise<CheckInteractionsResult> {
-  const supabase = await createClient();
-
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return { success: false, interactionsFound: 0, newInteractions: 0, error: "Not authenticated" };
+  const authResult = await getAuthenticatedUser();
+  if (authResult.error) {
+    return { success: false, interactionsFound: 0, newInteractions: 0, error: authResult.error };
   }
+  const { supabase, user } = authResult;
 
   // Verify member belongs to user
   const { data: member } = await supabase
@@ -267,12 +264,11 @@ export async function checkMemberInteractions(
 export async function acknowledgeInteraction(
   interactionId: string
 ): Promise<InteractionActionState> {
-  const supabase = await createClient();
-
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return { success: false, error: "Not authenticated" };
+  const authResult = await getAuthenticatedUser();
+  if (authResult.error) {
+    return { success: false, error: authResult.error };
   }
+  const { supabase, user } = authResult;
 
   // Get interaction
   const { data: interaction } = await supabase

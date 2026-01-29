@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { getAuthenticatedUser, type AuthSuccess } from "@/lib/supabase/server";
 import type {
   DocumentActionState,
   DocumentWithOwner,
@@ -13,14 +13,11 @@ export async function getDocuments(): Promise<{
   error?: string;
   data: DocumentWithOwner[];
 }> {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return { error: "Not authenticated", data: [] };
+  const authResult = await getAuthenticatedUser();
+  if (authResult.error) {
+    return { error: authResult.error, data: [] };
   }
+  const { supabase, user } = authResult as AuthSuccess;
 
   // Get user's family member IDs first
   const { data: familyMembers, error: familyError } = await supabase
@@ -67,14 +64,11 @@ export async function getDocuments(): Promise<{
 export async function createDocument(
   uploadData: DocumentUploadData
 ): Promise<DocumentActionState> {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return { error: "Not authenticated" };
+  const authResult = await getAuthenticatedUser();
+  if (authResult.error) {
+    return { error: authResult.error };
   }
+  const { supabase, user } = authResult;
 
   // Verify owner_id belongs to user's family (defense in depth beyond RLS)
   const { data: familyMember, error: memberError } = await supabase
@@ -115,14 +109,11 @@ export async function createDocument(
 export async function deleteDocument(
   documentId: string
 ): Promise<DocumentActionState> {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return { error: "Not authenticated" };
+  const authResult = await getAuthenticatedUser();
+  if (authResult.error) {
+    return { error: authResult.error };
   }
+  const { supabase, user } = authResult;
 
   // Get document with ownership check via family_members join
   const { data: doc, error: fetchError } = await supabase
@@ -177,14 +168,11 @@ export async function deleteDocument(
 export async function getDocumentUrl(
   filePath: string
 ): Promise<{ url?: string; error?: string }> {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return { error: "Not authenticated" };
+  const authResult = await getAuthenticatedUser();
+  if (authResult.error) {
+    return { error: authResult.error };
   }
+  const { supabase, user } = authResult;
 
   // Verify user owns this file path (path starts with user ID)
   if (!filePath.startsWith(user.id)) {

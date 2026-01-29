@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { getAuthenticatedUser } from "@/lib/supabase/server";
 import type { FamilyActionState, FamilyMember } from "@/types/family";
 import type { Gender } from "@/types/database";
 
@@ -9,14 +9,11 @@ export async function getFamilyMembers(): Promise<{
   error?: string;
   data: FamilyMember[];
 }> {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return { error: "Not authenticated", data: [] };
+  const authResult = await getAuthenticatedUser();
+  if (authResult.error) {
+    return { error: authResult.error, data: [] };
   }
+  const { supabase, user } = authResult;
 
   const { data, error } = await supabase
     .from("family_members")
@@ -32,12 +29,9 @@ export async function getFamilyMembers(): Promise<{
 }
 
 export async function getFamilyMemberCount(): Promise<number> {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return 0;
+  const authResult = await getAuthenticatedUser();
+  if (authResult.error) return 0;
+  const { supabase, user } = authResult;
 
   const { count, error } = await supabase
     .from("family_members")
@@ -52,14 +46,11 @@ export async function createFamilyMember(
   prevState: FamilyActionState,
   formData: FormData
 ): Promise<FamilyActionState> {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return { error: "Not authenticated" };
+  const authResult = await getAuthenticatedUser();
+  if (authResult.error) {
+    return { error: authResult.error };
   }
+  const { supabase, user } = authResult;
 
   const full_name = formData.get("full_name") as string;
   const date_of_birth = formData.get("date_of_birth") as string | null;
@@ -97,14 +88,11 @@ export async function updateFamilyMember(
   prevState: FamilyActionState,
   formData: FormData
 ): Promise<FamilyActionState> {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return { error: "Not authenticated" };
+  const authResult = await getAuthenticatedUser();
+  if (authResult.error) {
+    return { error: authResult.error };
   }
+  const { supabase, user } = authResult;
 
   const full_name = formData.get("full_name") as string;
   const date_of_birth = formData.get("date_of_birth") as string | null;
@@ -140,14 +128,11 @@ export async function updateFamilyMember(
 export async function deleteFamilyMember(
   memberId: string
 ): Promise<FamilyActionState> {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return { error: "Not authenticated" };
+  const authResult = await getAuthenticatedUser();
+  if (authResult.error) {
+    return { error: authResult.error };
   }
+  const { supabase, user } = authResult;
 
   const { error } = await supabase
     .from("family_members")
@@ -166,14 +151,11 @@ export async function deleteFamilyMember(
 }
 
 export async function addSelfAsFamilyMember(): Promise<FamilyActionState> {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return { error: "Not authenticated" };
+  const authResult = await getAuthenticatedUser();
+  if (authResult.error) {
+    return { error: authResult.error };
   }
+  const { supabase, user } = authResult;
 
   // Get user's profile for name
   const { data: profile } = await supabase
