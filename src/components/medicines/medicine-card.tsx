@@ -19,16 +19,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog";
 import { toggleMedicineActive, deleteMedicine } from "@/actions/medicines";
 import type { MedicineDisplay } from "@/types/medicines";
 import { cn } from "@/lib/utils";
@@ -161,29 +152,14 @@ export function MedicineCard({
         </CardContent>
       </Card>
 
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Medicine?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently delete &quot;{medicine.name}&quot; from the
-              records.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isPending} className="min-h-[44px]">
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              disabled={isPending}
-              className="bg-red-600 hover:bg-red-700 min-h-[44px]"
-            >
-              {isPending ? "Deleting..." : "Delete"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DeleteConfirmationDialog
+        open={showDeleteDialog}
+        onOpenChange={setShowDeleteDialog}
+        title="Delete Medicine?"
+        description={`This will permanently delete "${medicine.name}" from the records.`}
+        onConfirm={handleDelete}
+        isDeleting={isPending}
+      />
     </>
   );
 }
