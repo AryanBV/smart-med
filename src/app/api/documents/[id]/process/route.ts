@@ -74,7 +74,7 @@ export async function POST(
 
     // Download file from storage
     const { data: fileData, error: downloadError } = await supabase.storage
-      .from("documents")
+      .from("prescriptions")
       .download(document.file_path);
 
     if (downloadError || !fileData) {

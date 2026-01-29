@@ -159,7 +159,7 @@ export async function deleteDocument(
 
   // Delete from storage (continue even if this fails - DB record is gone)
   const { error: storageError } = await supabase.storage
-    .from("documents")
+    .from("prescriptions")
     .remove([doc.file_path]);
 
   if (storageError) {
@@ -192,7 +192,7 @@ export async function getDocumentUrl(
   }
 
   const { data, error } = await supabase.storage
-    .from("documents")
+    .from("prescriptions")
     .createSignedUrl(filePath, 60 * 60); // 1 hour expiry
 
   if (error) {

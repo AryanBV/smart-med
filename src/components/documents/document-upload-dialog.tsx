@@ -125,7 +125,7 @@ export function DocumentUploadDialog({
 
       // Upload to storage
       const { error: uploadError } = await supabase.storage
-        .from("documents")
+        .from("prescriptions")
         .upload(filePath, file, {
           cacheControl: "3600",
           upsert: false,
@@ -148,7 +148,7 @@ export function DocumentUploadDialog({
 
       if (result.error) {
         // Rollback: delete uploaded file if database insert fails
-        await supabase.storage.from("documents").remove([filePath]);
+        await supabase.storage.from("prescriptions").remove([filePath]);
         throw new Error(result.error);
       }
 
