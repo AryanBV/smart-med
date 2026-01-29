@@ -7,60 +7,64 @@ import { InteractionAlert } from "@/components/interactions/interaction-alert";
 async function getStats(userId: string) {
   const supabase = await createClient();
 
-  // Get family member count
-  const { count: familyCount } = await supabase
-    .from("family_members")
-    .select("*", { count: "exact", head: true })
-    .eq("created_by", userId);
-
-  // Get document count (through family members)
-  const { data: familyIds } = await supabase
+  // Get family members first (needed for filtering other queries)
+  const { data: members } = await supabase
     .from("family_members")
     .select("id")
     .eq("created_by", userId);
 
-  let documentCount = 0;
-  let medicineCount = 0;
-  let interactionCount = 0;
+  const memberIds = members?.map((m) => m.id) ?? [];
 
-  if (familyIds && familyIds.length > 0) {
-    const ids = familyIds.map((f) => f.id);
+  if (memberIds.length === 0) {
+    return {
+      familyCount: 0,
+      documentCount: 0,
+      medicineCount: 0,
+      interactionCount: 0,
+    };
+  }
 
-    const { count: docCount } = await supabase
-      .from("documents")
-      .select("*", { count: "exact", head: true })
-      .in("owner_id", ids);
-    documentCount = docCount || 0;
-
-    const { count: medCount } = await supabase
-      .from("medicines")
-      .select("*", { count: "exact", head: true })
-      .in("owner_id", ids)
-      .eq("is_active", true);
-    medicineCount = medCount || 0;
-
-    // Get medicine IDs for interaction check
-    const { data: medicineIds } = await supabase
-      .from("medicines")
-      .select("id")
-      .in("owner_id", ids)
-      .eq("is_active", true);
-
-    if (medicineIds && medicineIds.length > 0) {
-      const medIds = medicineIds.map((m) => m.id);
-      const { count: intCount } = await supabase
-        .from("drug_interactions")
+  // Run remaining counts in parallel
+  const [familyResult, docsResult, medsResult, medsForInteractions] =
+    await Promise.all([
+      supabase
+        .from("family_members")
         .select("*", { count: "exact", head: true })
-        .in("medicine_1_id", medIds)
-        .eq("is_acknowledged", false);
-      interactionCount = intCount || 0;
-    }
+        .eq("created_by", userId),
+      supabase
+        .from("documents")
+        .select("*", { count: "exact", head: true })
+        .in("owner_id", memberIds),
+      supabase
+        .from("medicines")
+        .select("*", { count: "exact", head: true })
+        .in("owner_id", memberIds)
+        .eq("is_active", true),
+      supabase
+        .from("medicines")
+        .select("id")
+        .in("owner_id", memberIds)
+        .eq("is_active", true),
+    ]);
+
+  const medicineIds = medsForInteractions.data?.map((m) => m.id) ?? [];
+
+  let interactionCount = 0;
+  if (medicineIds.length > 0) {
+    const { count } = await supabase
+      .from("drug_interactions")
+      .select("*", { count: "exact", head: true })
+      .or(
+        `medicine_1_id.in.(${medicineIds.join(",")}),medicine_2_id.in.(${medicineIds.join(",")})`
+      )
+      .eq("is_acknowledged", false);
+    interactionCount = count ?? 0;
   }
 
   return {
-    familyCount: familyCount || 0,
-    documentCount,
-    medicineCount,
+    familyCount: familyResult.count ?? 0,
+    documentCount: docsResult.count ?? 0,
+    medicineCount: medsResult.count ?? 0,
     interactionCount,
   };
 }
