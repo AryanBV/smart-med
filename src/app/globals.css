@@ -149,3 +149,33 @@
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 }
+
+/* Family Chart - SMART-MED Theme Overrides */
+.f3 {
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+.f3 .link {
+  stroke: #0d9488;
+  stroke-width: 2px;
+}
+
+.f3 .link-spouse {
+  stroke: #ec4899;
+  stroke-dasharray: 6, 4;
+}
+
+.family-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 24px -4px rgba(0, 0, 0, 0.18);
+}
+
+/* Dark mode overrides for family chart */
+.dark .family-card {
+  background: #1f2937 !important;
+  border-color: #374151 !important;
+}
+
+.dark .family-card div[style*="color: #1f2937"] {
+  color: #f3f4f6 !important;
+}
