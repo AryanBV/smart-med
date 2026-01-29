@@ -14,6 +14,7 @@ import {
 import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog";
 import type { FamilyMember } from "@/types/family";
 import { deleteFamilyMember } from "@/actions/family";
+import { formatDate } from "@/lib/utils";
 
 interface FamilyMemberCardProps {
   member: FamilyMember;
@@ -30,15 +31,6 @@ export function FamilyMemberCard({ member, onEdit }: FamilyMemberCardProps) {
     .join("")
     .toUpperCase()
     .slice(0, 2);
-
-  const formatDate = (dateString: string | null) => {
-    if (!dateString) return null;
-    return new Date(dateString).toLocaleDateString("en-IN", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
-  };
 
   const calculateAge = (dateString: string | null) => {
     if (!dateString) return null;

@@ -13,3 +13,12 @@ export function isValidUUID(value: string): boolean {
 export function validateUUIDs(ids: string[]): string[] {
   return ids.filter(isValidUUID);
 }
+
+export function formatDate(dateString: string | null): string | null {
+  if (!dateString) return null;
+  return new Date(dateString).toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}

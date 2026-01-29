@@ -22,6 +22,7 @@ import { OcrStatusBadge } from "./ocr-status-badge";
 import { deleteDocument, getDocumentUrl } from "@/actions/documents";
 import { formatFileSize } from "@/types/documents";
 import type { DocumentWithOwner } from "@/types/documents";
+import { formatDate } from "@/lib/utils";
 
 interface DocumentCardProps {
   document: DocumentWithOwner;
@@ -36,14 +37,6 @@ export function DocumentCard({ document }: DocumentCardProps) {
   const [extractionError, setExtractionError] = useState<string | null>(null);
 
   const isPdf = document.file_type === "application/pdf";
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-IN", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
-  };
 
   const handleView = async () => {
     setIsLoadingUrl(true);
