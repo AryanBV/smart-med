@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { env } from "@/lib/env";
 
 export type AuthActionState = {
   error?: string;
@@ -39,7 +40,7 @@ export async function signUp(
       data: {
         full_name: fullName.trim(),
       },
-      emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
+      emailRedirectTo: `${env.SITE_URL}/auth/callback`,
     },
   });
 
@@ -95,7 +96,7 @@ export async function signInWithGoogle(): Promise<void> {
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {
-      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
+      redirectTo: `${env.SITE_URL}/auth/callback`,
     },
   });
 
